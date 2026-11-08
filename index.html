@@ -3200,7 +3200,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         const now = g.time, p = g.player;
 
         const rawDir = touchDir || padDirection || heldKeys[heldKeys.length - 1] || null;
-        if(!rawDir||g.edgeDwell?.dir!==rawDir)g.edgeDwell=null;const dir = movementDirection(rawDir);
+        if(!rawDir||!freeMovement12&&g.edgeDwell?.dir!==rawDir)g.edgeDwell=null;const dir = movementDirection(rawDir);
         if (dir&&!g.hookAction) {
             if(!g.actionHeld||!g.grabDir)p.facing = dir;
             g.hudShowUntil = now + HUD_HOLD_MS;
@@ -3748,7 +3748,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         const y0 = Math.max(bounds.y, Math.floor(camY / ts)), y1 = Math.min(bounds.y+bounds.size-1, Math.floor((camY + h) / ts)+1);
         const sp = spikeState(), depth=[];
         for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-            if(depthTile12(x,y)){ctx.fillStyle=terrainPaint(normalizeFloorTexture(g.room.terrain?.[`${x},${y}`]??g.room.floorTexture));ctx.fillRect(x*ts,y*ts,ts,ts);depth.push({y:y+.4,paint:()=>drawRaisedTile12(x,y,sp)});}else drawTile(x,y,sp);
+            if(depthTile12(x,y)){drawGround14(x,y);depth.push({y:y+.4,paint:()=>drawRaisedTile12(x,y,sp)});}else drawTile(x,y,sp);
         }
         drawPlatforms();drawBeams();
         drawCinemaGhost();
@@ -5735,7 +5735,7 @@ setupModeThree();
     brushFromGear=function(v){return{...brushFromGearBeforeLab(v),bombFuse:clamp(+v?.bombFuse||1500,500,10000)};};
     const applyStartingGearBeforeLab=applyStartingGear;
     applyStartingGear=function(g,v){applyStartingGearBeforeLab(g,v);g.bombFuse=clamp(+v?.bombFuse||1500,500,10000);};
-    for(const event of ['keyup','pointerup','touchend','touchcancel','blur'])window.addEventListener(event,()=>{if(G)G.edgeDwell=null;});
+    for(const event of ['keyup','blur'])window.addEventListener(event,()=>{if(G)G.edgeDwell=null;});
 
     // Canales para desplazar bordes sin cambiar su orientación.
     Object.assign(brush,{edgeSlide:'none',edgeTravel:1,bossReturn:'button'});
@@ -6268,7 +6268,7 @@ setupModeThree();
     const flameSequence6=castFlame;castFlame=function(){const g=G;if(!g||g.over||g.paused)return;const[dx,dy]=DIRS[g.player.facing],x=g.player.x+dx,y=g.player.y+dy,t=g.grid[y]?.[x],wg=g.wgroups[tileId(t)];if(base(t)==='ftorch'&&wg?.sequence&&!g.litTorches.has(y*g.n+x)){const next=wg.order?.[wg.hit||0];if(next&&(next.x!==x||next.y!==y)){toast('Enciende primero la antorcha '+((wg.hit||0)+1)+' del grupo.',1500);return;}}return flameSequence6();};
     const customDraw6=drawTile;drawTile=function(x,y,sp){const t=G.grid[y][x],b=base(t);if(!['tree','sign','mouthStatue','buttonGroup','groupPad','swordUpgrade'].includes(b))return customDraw6(x,y,sp);const ts=cv.ts,style=normalizeFloorTexture(G.room.terrain?.[`${x},${y}`]??G.room.floorTexture);ctx.fillStyle=terrainPaint(style);ctx.fillRect(x*ts,y*ts,ts,ts);ctx.save();ctx.translate((x+.5)*ts,(y+.5)*ts);if(b==='mouthStatue')ctx.rotate(({D:0,L:Math.PI/2,U:Math.PI,R:-Math.PI/2})[readCustomReward(t).dir]||0);let pressed=false;if(b==='buttonGroup'||b==='groupPad'){const c=b==='buttonGroup'?readCustomReward(t):null,id=c?.id||tileId(t),index=c?0:+part(t,3),mode=c?c.buttons[0].mode:part(t,2);pressed=!!G.groupButtonConfigs?.get(id)?.done||!!(mode==='tap'?G.groupButtonLatched?.has(`${id}:${index}`):G.player.x===x&&G.player.y===y||blockAt(x,y)||mwallAt(x,y));if(pressed)ctx.filter='hue-rotate(65deg)';}if(b==='tree'&&G.treeGrab?.x===x&&G.treeGrab?.y===y)ctx.translate(Math.sin(G.time/35)*ts*.035,0);drawOriginal(b,0,pressed?ts*.06:0,ts*(pressed?.74:.95));ctx.restore();if(b==='swordUpgrade')numTag((x+.81)*ts,(y+.8)*ts,'×'+part(t,1),ts*.14);};
     const effectsTree6=drawAdventureEffects;drawAdventureEffects=function(){effectsTree6();const g=G;g.treeHearts=(g.treeHearts||[]).filter(q=>g.time-q.at<950);for(const q of g.treeHearts){const f=clamp((g.time-q.at)/650,0,1);emoji(q.ch||'💗',(q.x+(q.tx-q.x)*f+.5)*cv.ts,(q.y+(q.ty-q.y)*f+.35-Math.sin(f*Math.PI)*.7)*cv.ts,cv.ts*.62);}};
-    function applyNewObjectNotes(){const notes={tree:'Mantén Acción frente al árbol y sostén la dirección contraria durante un momento. Si contiene corazón, lo recibes directamente con una animación. Cada árbol entrega uno.',sign:'Escribe su texto. Mira el letrero de cerca y pulsa Acción para leerlo.',npc:'Lee con Acción. Opcionalmente crea un objeto o cadena al cerrar su mensaje, una sola vez.',mouthStatue:'Orienta su boca abierta. Solo acepta una bomba colocada desde ese lado. Al explotar se destruye y puede liberar una cadena.',buttonGroup:'Coloca de 2 a 5 botones. Cada botón puede quedar activado con una pisada o requerir peso continuo. Todos deben estar activados para liberar su cadena.',swordUpgrade:'Multiplica el daño actual de la espada por dos o tres. Las mejoras se acumulan y se conservan al viajar.',ftorch:'Enciende las antorchas con la flama. Activa secuencia para exigir el orden exacto en que las colocaste.',torchwall:'Las antorchas pueden exigir el orden de colocación antes de quitar la pared.',water:'Mantén una dirección para entrar al agua. Con aletas, pulsa repetidamente la dirección para aumentar la velocidad; al soltar frenas poco a poco. No puedes usar la espada nadando. Sin aletas pierdes escudo o corazón y regresas.',bomb:'Se coloca en la casilla libre frente al personaje. También puedes introducirla en la estatua boca desde su apertura. Configura la mecha.'};Object.assign(TOOL_NOTES,notes);Object.assign(GUIDE_DETAILS,notes);}
+    function applyNewObjectNotes(){const notes={tree:'Mantén Acción frente al árbol y sostén la dirección contraria durante un momento. Si contiene corazón, lo recibes directamente con una animación. Cada árbol entrega uno.',sign:'Escribe su texto. Mira el letrero de cerca y pulsa Acción para leerlo.',npc:'Lee con Acción. Opcionalmente crea un objeto o cadena al cerrar su mensaje, una sola vez.',mouthStatue:'Orienta su boca abierta. Solo acepta una bomba colocada desde ese lado. Al explotar se destruye y puede liberar una cadena.',buttonGroup:'Coloca de 2 a 5 botones. Cada botón puede quedar activado con una pisada o requerir peso continuo. Todos deben estar activados para liberar su cadena.',swordUpgrade:'Multiplica el daño actual de la espada por dos o tres. Las mejoras se acumulan y se conservan al viajar.',ftorch:'Enciende las antorchas con la flama. Activa secuencia para exigir el orden exacto en que las colocaste.',torchwall:'Las antorchas pueden exigir el orden de colocación antes de quitar la pared.',water:'Mantén una dirección para entrar al agua. Con aletas, pulsa repetidamente la dirección para aumentar la velocidad; al soltar frenas poco a poco. No puedes usar la espada nadando. Sin aletas pierdes escudo o corazón y regresas.',bomb:'Se coloca enfrente si hay espacio; si no, queda en la casilla del personaje. También puedes colocarla sobre rocas e introducirla en la estatua boca desde su apertura. Configura la mecha.'};Object.assign(TOOL_NOTES,notes);Object.assign(GUIDE_DETAILS,notes);}
 
     function swimPulse6(dir){const g=G;if(!isSwimming(g)||!DIRS[dir])return;let m=g.swimMotion;if(!m||m.dir!==dir)m=g.swimMotion={dir,level:0,lastPulse:-1e9,next:g.time};if(g.time-m.lastPulse<85)return;m.level=Math.min(5,m.level+1);m.lastPulse=g.time;m.releaseAt=null;g.player.facing=dir;g.actionHeld=false;g.grabDir=null;g.waterMoveUntil=0;g.hasInteracted=true;}
     const swimPrime6=primeDirection;primeDirection=function(dir){if(isSwimming()){swimPulse6(dir);return;}return swimPrime6(dir);};
@@ -6512,7 +6512,7 @@ setupModeThree();
     function freeInput12(){if(gestureInput){const a=gestureInput,x=a.cx-a.x,y=a.cy-a.y,l=Math.hypot(x,y),dir=l<18?null:Math.abs(x)>Math.abs(y)?(x>0?'R':'L'):(y>0?'D':'U');return{x:dir?x/l:0,y:dir?y/l:0,dir};}if(padDirection&&freePadVector12){const{x,y}=freePadVector12,l=Math.hypot(x,y);if(l)return{x:x/l,y:y/l,dir:padDirection};}const dir=touchDir||padDirection;if(dir)return {x:DIRS[dir][0],y:DIRS[dir][1],dir};let x=0,y=0;for(const d of new Set(heldKeys)){x+=DIRS[d]?.[0]||0;y+=DIRS[d]?.[1]||0;}const length=Math.hypot(x,y),last=heldKeys.at(-1);return {x:length?x/length:0,y:length?y/length:0,dir:last||null};}
     function freePlayer12(dt){
         const g=G,p=g.player,q=freePose12(p);if(g.over||g.paused||g.doorTransit||g.hookAction||g.time<(g.hookSettleUntil||0)||platformAt(p.x,p.y)?.motion){delete p.freePose12;return;}
-        let input=freeInput12();if(g.turnInput&&input.dir===g.turnInput.dir&&g.time-g.turnInput.since<240){p.rx=q.x;p.ry=q.y;return;}g.turnInput=null;
+        let input=freeInput12();if(g.edgeDwell){const [dx,dy]=DIRS[g.edgeDwell.dir];if(dx*input.x+dy*input.y<=0)g.edgeDwell=null;}if(g.turnInput&&input.dir===g.turnInput.dir&&g.time-g.turnInput.since<240){p.rx=q.x;p.ry=q.y;return;}g.turnInput=null;
         if(g.actionHeld&&g.treeGrab){if(input.dir)tryPlayerMove(input.dir);else g.treeGrab.since=null;p.rx=q.x;p.ry=q.y;return;}
         if(g.actionHeld&&g.grabDir){input.dir=input.dir===g.grabDir||input.dir===OPP[g.grabDir]?input.dir:null;input.x=input.dir?DIRS[input.dir][0]:0;input.y=input.dir?DIRS[input.dir][1]:0;}
         let speed=1000/Math.max(100,moveDelay(g.speedP));
@@ -6521,7 +6521,9 @@ setupModeThree();
         p.move8=input.key||null;if(!g.grabDir)p.facing=input.dir;g.lastMotion=g.time;g.hudShowUntil=g.time+HUD_HOLD_MS;g.freeWalking12=true;if(g.time<(g.webMoveUntil||0)||g.time<(g.webUntil||0))speed*=.45;
         const steps=Math.max(1,Math.ceil(speed*dt/.045));
         for(let i=0;i<steps;i++)for(const axis of ['x','y']){
-            const amount=input[axis]*speed*dt/steps;if(!amount)continue;const dir=axis==='x'?(amount>0?'R':'L'):(amount>0?'D':'U'),nx=q.x+(axis==='x'?amount:0),ny=q.y+(axis==='y'?amount:0),cx=Math.floor(nx+.5),cy=Math.floor(ny+.5),[dx,dy]=DIRS[dir],tx=p.x+dx,ty=p.y+dy;
+            const amount=input[axis]*speed*dt/steps;if(!amount)continue;const dir=axis==='x'?(amount>0?'R':'L'):(amount>0?'D':'U');let nx=q.x+(axis==='x'?amount:0),ny=q.y+(axis==='y'?amount:0);
+            const guarded=guardPitMotion14(q,nx,ny,axis,input);if(!guarded)continue;if(guarded.enter){const ok=tryPlayerMove(guarded.enter);if(G!==g||g.over||g.paused)return;if(ok){delete p.freePose12;p.rx=p.x;p.ry=p.y;g.waterMoveUntil=0;return;}continue;}nx=guarded.x;ny=guarded.y;
+            const cx=Math.floor(nx+.5),cy=Math.floor(ny+.5),[dx,dy]=DIRS[dir],tx=p.x+dx,ty=p.y+dy;
             const fits=freeFits12(nx,ny,false,.40,.23,q),cross=cx!==p.x||cy!==p.y,approaching=inb(tx,ty)&&Math.abs((axis==='x'?nx-p.x:ny-p.y))>.20&&(bt(tx,ty)==='hole'||isDeepWater(g,tx,ty))&&!isSwimming(g)&&!platformAt(tx,ty);
             if(cross||!fits||approaching){
                 // A bump still reaches the existing push, door, water and hole logic.
@@ -6642,6 +6644,65 @@ setupModeThree();
     function giantNeighbors8_13(e,px=e.x,py=e.y){const out=[];for(const[key,[dx,dy]]of Object.entries(MOVE8_13)){const dir=dx&&dy?e.dir:dx?(dx>0?'R':'L'):(dy>0?'D':'U'),x=px+dx,y=py+dy;if(!giantFits(e,x,y,dir)||giantCells(e,px,py,dir).some(q=>!step8Clear13(q.x,q.y,dx,dy)))continue;if(dx&&dy&&(!giantFits(e,px+dx,py,dir)||!giantFits(e,px,py+dy,dir)))continue;out.push({x,y,dir,key,cost:Math.hypot(dx,dy)});}return out;}
     const giantNeighborsBefore13=giantNeighbors;giantNeighbors=function(e){return freeMovement12?giantNeighbors8_13(e):giantNeighborsBefore13(e);};
     const navigateBefore13=navigateGiant;navigateGiant=function(e,target,now,mode='hunt',delay=e.config.moveMs){if(!freeMovement12)return navigateBefore13(e,target,now,mode,delay);const choices=giantNeighbors8_13(e);if(!choices.length){e.next=now+delay;return false;}let next;if(mode==='flee')next=choices.sort((a,b)=>Math.hypot(b.x-target.x,b.y-target.y)-Math.hypot(a.x-target.x,a.y-target.y))[0];else next=route8_13(e,target,(x,y)=>giantNeighbors8_13(e,x,y));const moved=moveGiantChoice(e,next,now,delay);if(moved)e.move8=next.key;return moved;};
+
+    // The ground remains in world space; only the prop enters the depth queue.
+    function groundStyle14(x,y){return normalizeFloorTexture(G.room.terrain?.[`${x},${y}`]??(base(G.grid[y][x])==='floor'&&part(G.grid[y][x],1)||G.room.floorTexture));}
+    function drawGround14(x,y){ctx.fillStyle=terrainPaint(groundStyle14(x,y));ctx.fillRect(x*cv.ts,y*cv.ts,cv.ts,cv.ts);const wet=waterAt(G,x,y);if(wet)drawWaterCell(x,y,wet.deep,wet.deep?1:.48);}
+    drawRaisedTile12=function(x,y,sp){
+        const ts=cv.ts,fill=ctx.fillRect,oldFloor=colors.floor,art=drawOriginal,water=drawWaterCell;
+        colors.floor=terrainPaint(groundStyle14(x,y));const previous=ctx.fillStyle;ctx.fillStyle=colors.floor;const ground=ctx.fillStyle;ctx.fillStyle=previous;
+        ctx.save();ctx.translate(0,(y+1)*ts);ctx.scale(1,1.22);ctx.translate(0,-(y+1)*ts);
+        ctx.fillRect=function(px,py,w,h){if(px===x*ts&&py===y*ts&&Math.abs(w-ts)<1&&Math.abs(h-ts)<1&&this.fillStyle===ground)return;return fill.call(this,px,py,w,h);};
+        drawOriginal=function(name,...args){if(name==='floor'||name.startsWith('floor_'))return true;return art(name,...args);};drawWaterCell=function(){};
+        try{drawTile(x,y,sp);}finally{ctx.fillRect=fill;drawOriginal=art;drawWaterCell=water;colors.floor=oldFloor;ctx.restore();}
+    };
+
+    // The support footprint follows the drawn feet, including neighboring pits.
+    // Merely walking alongside an edge never starts a fall or a water entry.
+    const FOOT14={half:.22,top:.25,bottom:.43};
+    function unsafeEdge14(x,y){const g=G,p=g.player;if(!inb(x,y)||x===p.x&&y===p.y||platformAt(x,y)||blockAt(x,y)||g.boxBridges?.has(y*g.n+x))return false;const deep=isDeepWater(g,x,y);return deep?!isSwimming(g):bt(x,y)==='hole';}
+    function feetHits14(x,y){const hits=[];for(let yy=Math.floor(y+FOOT14.top+.5);yy<=Math.floor(y+FOOT14.bottom+.5-.00001);yy++)for(let xx=Math.floor(x-FOOT14.half+.5);xx<=Math.floor(x+FOOT14.half+.5-.00001);xx++)if(unsafeEdge14(xx,yy))hits.push({x:xx,y:yy});return hits;}
+    function guardPitMotion14(q,nx,ny,axis,input){
+        const g=G,p=g.player;if(g.hookAction||g.doorTransit||standingOnBox(g)||platformAt(p.x,p.y)?.motion)return{x:nx,y:ny};
+        const hits=feetHits14(nx,ny);if(!hits.length)return{x:nx,y:ny};
+        for(const hole of hits){const dx=hole.x-p.x,dy=hole.y-p.y;
+            if(Math.abs(dx)+Math.abs(dy)===1&&((dx&&Math.sign(input.x)===dx)||(dy&&Math.sign(input.y)===dy))){
+                const dir=dx?(dx>0?'R':'L'):(dy>0?'D':'U');return{enter:dir};
+            }
+            // Slide parallel to the rim, correcting only the perpendicular axis.
+            if(axis==='x'&&hole.y!==p.y)ny=hole.y>p.y?Math.min(ny,hole.y-.5-FOOT14.bottom):Math.max(ny,hole.y+.5-FOOT14.top);
+            else if(axis==='y'&&hole.x!==p.x)nx=hole.x>p.x?Math.min(nx,hole.x-.5-FOOT14.half):Math.max(nx,hole.x+.5+FOOT14.half);
+            else return null;
+        }
+        if(feetHits14(nx,ny).length||!freeFits12(nx,ny,false,.40,.23,q))return null;
+        return{x:nx,y:ny};
+    }
+
+    // Each finger owns its control. Secondary touch presses act immediately,
+    // rather than waiting for the browser's primary-finger click synthesis.
+    const actionTouches14=new Map(),touchClicks14=new Map();
+    function touchEquipment14(w){
+        const g=G;if(!g||g.paused||g.over)return;if(controlPrefs.useObjectButton){controlAction(w);return;}
+        if(w==='sword'&&!g.hasSword||w==='bow'&&!g.hasBow||w==='hook'&&!g.hasHook||w==='bomb'&&g.bombCount<=0||w==='torch'&&!g.hasTorch)return;
+        const previous=g.weapon;g.weapon=w;activateSelectedObject();g.weapon=previous==='bomb'&&g.bombCount<=0?null:previous;g.hudKey='';
+    }
+    const touchActions14={btnSword:()=>touchEquipment14('sword'),btnBow:()=>touchEquipment14('bow'),btnBomb:()=>touchEquipment14('bomb'),btnHook:()=>touchEquipment14('hook'),btnTorch:()=>touchEquipment14('torch'),btnObject:activateSelectedObject,btnAntidote:()=>useAntidote()};
+    for(const[id,act]of Object.entries(touchActions14)){const b=$(id);if(!b)continue;
+        b.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;e.preventDefault();e.stopImmediatePropagation();if(!G||G.over||G.paused)return;initAudio();actionTouches14.set(e.pointerId,id);touchClicks14.set(id,performance.now()+1200);b.setPointerCapture?.(e.pointerId);act();},true);
+        for(const type of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(type,e=>{if(actionTouches14.get(e.pointerId)!==id)return;e.preventDefault();e.stopPropagation();actionTouches14.delete(e.pointerId);touchClicks14.set(id,performance.now()+800);});
+        b.addEventListener('click',e=>{if((touchClicks14.get(id)||0)>performance.now()&&(e.pointerType==='touch'||e.pointerType==='pen'||e.sourceCapabilities?.firesTouchEvents||!e.pointerType&&e.detail>0)){e.preventDefault();e.stopImmediatePropagation();}},true);
+    }
+    const actionStyle14=document.createElement('style');actionStyle14.textContent='#gameScreen,#gameCanvas,#freeMovePad13,#mobileArrows,#gameScreen .corner,#gameScreen .custom-play-control{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}';document.head.append(actionStyle14);
+    window.addEventListener('blur',()=>{actionTouches14.clear();touchClicks14.clear();});
+
+    const frontOrFeetBomb14=placeFrontBomb;placeFrontBomb=function(){
+        const g=G;if(!g||g.paused||g.over||g.doorTransit||!g.bombCount)return false;const p=g.player,[dx,dy]=DIRS[p.facing],x=p.x+dx,y=p.y+dy;
+        let front=inb(x,y)&&!edgeBlocked(p.x,p.y,x,y)&&!g.bombs.some(b=>b.x===x&&b.y===y);
+        if(front){const t=g.grid[y][x],b=base(t),group=puzzleAt8(x,y);front=b==='mouthStatue'?readCustomReward(t).dir===OPP[p.facing]&&(!group||!group.done&&group.phase==='ready'&&!group.loaded.has(puzzleIndex8(group,x,y))):['floor','rock','coveredHole'].includes(b)&&!(b==='floor'&&waterAt(g,x,y))&&!blockAt(x,y)&&!mwallAt(x,y)&&!enemyAt(x,y);}
+        if(front&&frontOrFeetBomb14())return true;
+        if(g.bombs.some(b=>b.x===p.x&&b.y===p.y))return false;
+        g.bombCount--;g.bombs.push({x:p.x,y:p.y,t0:g.time,fuse:g.bombFuse||BOMB_FUSE,mouthKey:null});g.nextAttack=g.time+300;g.handPose={kind:'throw',until:g.time+300};playSound('press');if(!g.bombCount)g.weapon=null;g.hudKey='';return true;
+    };
 
     setupPadEditor();
     setupPadNavigation();
