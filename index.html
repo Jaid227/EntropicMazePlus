@@ -2561,7 +2561,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         const shade=$('deathShade');shade.classList.remove('hidden');requestAnimationFrame(()=>shade.classList.add('dark'));
         S.timer=setTimeout(()=>{if(!G||G!==g)return;const confirmAction=(label,fn)=>async ()=>{if((await padDialog('¿Estás seguro de '+label+'?','confirm'))){shade.classList.remove('dark');shade.classList.add('hidden');fn();}};
             const choices=[];if(checkpointState)choices.push(['💾 Continuar desde el punto guardado',confirmAction('continuar desde el punto guardado',restoreCheckpoint),true]);
-            choices.push(['🔄 Reiniciar cuarto',confirmAction('reiniciar el cuarto',restartRoom)],['🏠 Menú principal',()=>exitGame('main')]);
+            choices.push(['🔄 Reiniciar cuarto',confirmAction('reiniciar el cuarto',restartRoom)]);if(S.mode==='test')choices.push(['✏️ Regresar al editor',confirmAction('regresar al editor',()=>exitGame('editor'))]);choices.push(['🏠 Menú principal',()=>exitGame('main')]);
             showOverlay('💀 Has perdido',choices,'death');},1500);
     }
     function requestRoomTravel(delta){
@@ -3751,6 +3751,8 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
             if(depthTile12(x,y)){drawGround14(x,y);depth.push({y:y+.4,paint:()=>drawRaisedTile12(x,y,sp)});}else drawTile(x,y,sp);
         }
         drawPlatforms();drawBeams();
+        drawDarkness(depth);
+        for(const bridge of g.bridges||[])for(const cell of bridge.path){const coversSwimmer=g.bridgeUnder14&&g.player.x===cell.x&&g.player.y===cell.y;depth.push({y:cell.y+(coversSwimmer?.5:.25),paint:()=>drawBridgeCell14(bridge,cell)});}
         drawCinemaGhost();
 
         ctx.strokeStyle = colors.accent; ctx.lineWidth = 3;
@@ -3862,7 +3864,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
                 ctx.globalAlpha = 1;
             }
         }
-        drawPoisonGas();drawDarkness();
+        drawPoisonGas();
         ctx.restore();drawGestureStick();
     }
 
@@ -3921,7 +3923,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         if(d)touchDir = d;
     }
     canvas.addEventListener('touchstart', e => {
-        e.preventDefault();if(controlPrefs.mode===3){gestureTouchStart(e);return;}
+        e.preventDefault();if(controlPrefs.mode===3||freeMovement12){gestureTouchStart(e);return;}
         initAudio();
         if (!G) return;
         for (const t of e.changedTouches) {
@@ -3932,7 +3934,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         recomputeTouchDir(e.touches);
     }, { passive: false });
     canvas.addEventListener('touchmove', e => {
-        e.preventDefault();if(controlPrefs.mode===3){gestureTouchMove(e);return;}
+        e.preventDefault();if(controlPrefs.mode===3||freeMovement12){gestureTouchMove(e);return;}
         if (!G) return;
         for (const t of e.changedTouches) {
             if (centerTouch && t.identifier === centerTouch.id && !centerTouch.fired) {
@@ -3949,7 +3951,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         recomputeTouchDir(e.touches);
     }, { passive: false });
     const touchEnd = e => {
-        e.preventDefault();if(controlPrefs.mode===3){gestureTouchEnd(e);return;}
+        e.preventDefault();if(controlPrefs.mode===3||freeMovement12){gestureTouchEnd(e);return;}
         for (const t of e.changedTouches) {
             if (centerTouch && t.identifier === centerTouch.id) {if(!centerTouch.fired&&e.type!=='touchcancel'&&['sword','hook'].includes(G?.weapon))useWeapon(G.player.facing);centerTouch = null;}
         }
@@ -4145,7 +4147,7 @@ function updateLightingOldest(){
  if(melted){playSound('door');computeBeams();}
 }
 let darknessCanvas=null;
-function drawDarkness(){
+function drawDarkness(depthQueue=null){
  const g=G;if(!g.darkCells.size&&!g.zones.some(z=>!g.visitedZones.has(z.id)))return;const ts=cv.ts,bounds=floorBounds(g,cinemaFocus(g).y),size=Math.ceil(bounds.size*ts),offset=bounds.y*ts;
  if(!darknessCanvas)darknessCanvas=document.createElement('canvas');if(darknessCanvas.width!==size)darknessCanvas.width=size;if(darknessCanvas.height!==size)darknessCanvas.height=size;
  const mask=darknessCanvas.getContext('2d');mask.clearRect(0,0,size,size);mask.globalCompositeOperation='source-over';
@@ -4155,7 +4157,9 @@ function drawDarkness(){
  for(const key of g.litTorches)lights.push({x:key%g.n+.5,y:Math.floor(key/g.n)+.5,r:2.7});
  for(let y=0;y<g.n;y++)for(let x=0;x<g.n;x++)if(base(g.grid[y][x])==='torchdecor'){const level=clamp(+part(g.grid[y][x],1)||5,1,10);lights.push({x:x+.5,y:y+.5,r:.7+.4*level,power:Math.min(1,.3+.14*level)});}
  for(const l of lights){if(l.y<bounds.y||l.y>=bounds.y+bounds.size)continue;const x=l.x*ts,y=l.y*ts-offset,r=l.r*ts*(1+.015*Math.sin(g.time/130+l.x));const grad=mask.createRadialGradient(x,y,r*.2,x,y,r);grad.addColorStop(0,`rgba(0,0,0,${l.power??1})`);grad.addColorStop(.65,`rgba(0,0,0,${.9*(l.power??1)})`);grad.addColorStop(1,'rgba(0,0,0,0)');mask.fillStyle=grad;mask.fillRect(x-r,y-r,2*r,2*r);}
- mask.globalCompositeOperation='source-over';mask.fillStyle='#02030a';for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id))for(const c of zoneCells(z,g.n))if(c.y>=bounds.y&&c.y<bounds.y+bounds.size)mask.fillRect(c.x*ts,c.y*ts-offset,ts+.5,ts+.5);ctx.drawImage(darknessCanvas,0,offset);
+ mask.globalCompositeOperation='source-over';mask.fillStyle='#02030a';for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id))for(const c of zoneCells(z,g.n))if(c.y>=bounds.y&&c.y<bounds.y+bounds.size)mask.fillRect(c.x*ts,c.y*ts-offset,ts+.5,ts+.5);
+ if(depthQueue){const keys=new Set(g.darkCells);for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id))for(const c of zoneCells(z,g.n))keys.add(c.y*g.n+c.x);for(const key of keys){const x=key%g.n,y=Math.floor(key/g.n);if(y<bounds.y||y>=bounds.y+bounds.size)continue;depthQueue.push({y:y+.4,paint:()=>ctx.drawImage(darknessCanvas,x*ts,y*ts-offset,ts,ts,x*ts,y*ts,ts,ts)});}return;}
+ ctx.drawImage(darknessCanvas,0,offset);
 }
 function showRoomSetup(){
  setupMusicDraft=null;if($('setupMusicFile')){$('setupMusicFile').value='';$('setupMusicName').textContent='Sin canción';}$('setupName').value='';$('setupSize').value=floorSize;$('setupFloors').value=floorCount;$('setupTime').value=120;if($('setupFloorTexture'))$('setupFloorTexture').value=roomFloorTexture;showScreen('setup');
@@ -4370,7 +4374,7 @@ function setupObjectEditing(){
 }
 
 const SHOP_ITEMS={antidote:{name:'Antídoto',icon:'🧪',price:12,qty:1},hook:{name:'Gancho',icon:'🪝',price:18,qty:5},torch:{name:'Antorcha portátil',icon:'🔥',price:15,qty:1},key:{name:'Llaves',icon:'🔑',price:8,qty:1},shield:{name:'Escudo',icon:'🛡️',price:10,qty:1},sword:{name:'Espada',icon:'🗡️',price:20,qty:1},bomb:{name:'Bomba',icon:'💣',price:8,qty:1},bow:{name:'Arco',icon:'🏹',price:20,qty:1},ammo:{name:'Flechas',icon:'➶',price:5,qty:5}};
-function defaultShop(){return{items:Object.entries(SHOP_ITEMS).map(([type,v])=>({type,price:v.price,qty:v.qty}))};}
+function defaultShop(){return{style:'shop',items:Object.entries(SHOP_ITEMS).map(([type,v])=>({type,price:v.price,qty:v.qty}))};}
 function hasChannelButton(id){return hasTile('btn',id)||hasTile('mwbtn',id)||hasTile('hbtn',id)||hasTile('switch',id);}
 function freeCrossId(){const ids=new Set();walkRewards(t=>{if(base(t)==='crossgate')ids.add(parseCross(t).id);});let i=1;while(ids.has(i))i++;return i;}
 function crossTile(c){return'crossgate:'+encodeURIComponent(JSON.stringify(c));}
@@ -4450,7 +4454,7 @@ function drawExtraTileCore(x,y){const t=G.grid[y][x],b=base(t),ts=cv.ts,cx=(x+.5
  ctx.fillStyle=colors.floor;ctx.fillRect(x*ts,y*ts,ts,ts);
  if(b==='boxCreator'){emoji('🔘',(x+.5)*ts,(y+.5)*ts,ts*.65);emoji('📦',(x+.78)*ts,(y+.78)*ts,ts*.24);return true;}
  if(b==='cash'){emoji(tileId(t)>10?'💰':'🪙',cx,cy,ts*.65);if(tileId(t)>1)numTag(cx+ts*.3,cy+ts*.3,tileId(t),ts*.16,'#b97d17');}
- if(b==='shop')emoji('🏪',cx,cy,ts*.8);
+ if(b==='shop'){const shopCfg=safeShop(t);emoji(shopCfg.style==='merchant'?'🧑‍💼':'🏪',cx,cy,ts*.8);}
  if(b==='switch'||b==='crossbtn'){emoji(part(t,2)==='hold'&&!G.mwalls.some(w=>w.id===tileId(t))?'⏺️':'🔘',cx,cy,ts*.6);
   if(b==='switch'&&G.mwalls.some(w=>w.id===tileId(t))){const left=Math.max(0,clamp(+part(t,3)||1,1,3)-(G.buttonUses?.get(`${x},${y}`)||0));numTag(cx-ts*.3,cy-ts*.3,left,ts*.13,left?'#a77516':'#555');}}
 
@@ -4458,10 +4462,11 @@ function drawExtraTileCore(x,y){const t=G.grid[y][x],b=base(t),ts=cv.ts,cx=(x+.5
  return true;
 }
 function updateShop(){const g=G,p=g.player;let found=null;for(let y=0;y<g.n;y++)for(let x=0;x<g.n;x++)if(base(g.grid[y][x])==='shop'&&Math.abs(x-p.x)+Math.abs(y-p.y)===1)found={x,y,key:`${x},${y}`,position:`${p.x},${p.y}`};if(!found){g.shopDwell=null;g.shopSuppressed=null;return;}if(g.shopSuppressed===found.key)return;if(!g.shopDwell||g.shopDwell.key!==found.key||g.shopDwell.position!==found.position)g.shopDwell={...found,since:g.time};if(g.time-g.shopDwell.since>=800){g.shopSuppressed=found.key;openGameShop(found.x,found.y);}}
-function safeShop(t){try{const cfg=JSON.parse(decodeURIComponent(part(t,1)));return{items:(cfg.items||[]).filter(v=>Object.hasOwn(SHOP_ITEMS,v.type)).map(v=>({type:v.type,price:clamp(Math.floor(+v.price||0),0,9999),qty:clamp(Math.floor(+v.qty||1),1,v.type==='hook'?20:100)}))};}catch(e){return defaultShop();}}
+function safeShop(t){try{const cfg=JSON.parse(decodeURIComponent(part(t,1)));return{style:cfg.style==='merchant'?'merchant':'shop',items:(cfg.items||[]).filter(v=>Object.hasOwn(SHOP_ITEMS,v.type)).map(v=>({type:v.type,price:clamp(Math.floor(+v.price||0),0,9999),qty:clamp(Math.floor(+v.qty||1),1,v.type==='hook'?20:100)}))};}catch(e){return defaultShop();}}
 function openGameShop(x,y){const g=G;g.paused=true;heldKeys=[];touchDir=null;$('gameShopModal').classList.remove('hidden');const cfg=safeShop(g.grid[y][x]);const render=()=>{const box=$('gameShopItems');box.innerHTML='';$('gameShopGold').textContent=`🪙 ${g.gold} monedas`;for(const item of cfg.items){const spec=SHOP_ITEMS[item.type],button=document.createElement('button');button.className='btn shop-purchase';button.textContent=`${spec.icon} ${spec.name} ${item.type==='hook'?item.qty+' cuadros':'×'+item.qty} · ${item.price} 🪙`;button.disabled=g.gold<item.price||(item.type==='fins'&&g.hasFins)||(item.type==='sword'&&g.hasSword)||(item.type==='bow'&&g.hasBow)||(item.type==='torch'&&g.hasTorch)||(item.type==='hook'&&g.hasHook&&(g.hookLength||5)>=item.qty);button.onclick=()=>{if(g.gold<item.price)return;g.gold-=item.price;if(item.type==='hook'){g.hasHook=true;g.hookLength=clamp(item.qty,1,20);if(!g.weapon)g.weapon='hook';}if(item.type==='fins')g.hasFins=true;if(item.type==='antidote')g.antidotes+=item.qty;if(item.type==='torch')g.hasTorch=true;if(item.type==='key')g.keys+=item.qty;if(item.type==='shield')g.shields+=item.qty;if(item.type==='bomb')g.bombCount+=item.qty;if(item.type==='ammo')g.ammo+=item.qty;if(item.type==='sword'){g.hasSword=true;g.weapon='sword';}if(item.type==='bow'){g.hasBow=true;g.weapon='bow';}g.hudKey='';playSound('key');render();};box.appendChild(button);}if(!cfg.items.length)box.textContent='Esta tienda no tiene artículos.';};render();}
 function closeGameShop(){ $('gameShopModal').classList.add('hidden');if(G){G.paused=false;lastTs=performance.now();}}
-function editShopConfig(ref,position){closeMobileEditorMenu();const cfg=ref?safeShop(ref.read()):defaultShop(),body=$('shopEditItems');body.innerHTML='';const rows=[];for(const [type,spec]of Object.entries(SHOP_ITEMS)){const row=document.createElement('label');row.className='shop-config-row';const check=document.createElement('input');check.type='checkbox';const item=cfg.items.find(i=>i.type===type);check.checked=!!item;const text=document.createElement('span');text.textContent=spec.icon+' '+spec.name;const price=document.createElement('input');price.type='number';price.min=0;price.max=9999;price.value=item?.price??spec.price;price.setAttribute('aria-label','Precio de '+spec.name);const qty=document.createElement('input');qty.type='number';qty.min=1;qty.max=type==='hook'?20:100;qty.value=item?.qty??spec.qty;qty.setAttribute('aria-label',type==='hook'?'Alcance del gancho en cuadros':'Cantidad de '+spec.name);if(type==='hook')qty.title='Alcance del gancho · 1 a 20 cuadros';row.append(check,text,price,qty);body.appendChild(row);rows.push({type,check,price,qty});}$('shopEditModal').classList.remove('hidden');$('shopEditApply').onclick=()=>{const data={items:rows.filter(r=>r.check.checked).map(r=>({type:r.type,price:clamp(Math.floor(+r.price.value||0),0,9999),qty:clamp(Math.floor(+r.qty.value||1),1,r.type==='hook'?20:100)}))},tile='shop:'+encodeURIComponent(JSON.stringify(data));if(ref)ref.write(tile);else board[position.y][position.x]=tile;$('shopEditModal').classList.add('hidden');afterEdit();};}
+function editShopConfig(ref,position){closeMobileEditorMenu();const cfg=ref?safeShop(ref.read()):defaultShop(),body=$('shopEditItems');body.innerHTML='';const styleRow=document.createElement('label');styleRow.className='shop-config-row';styleRow.style.gridTemplateColumns='1fr';styleRow.innerHTML='<span>Dibujo de la tienda</span>';const style=document.createElement('select');style.innerHTML='<option value="shop">🏪 Tienda</option><option value="merchant">🧑‍💼 Persona comerciante</option>';style.value=cfg.style||'shop';styleRow.append(style);body.append(styleRow);const rows=[];for(const [type,spec]of Object.entries(SHOP_ITEMS)){const row=document.createElement('label');row.className='shop-config-row';const check=document.createElement('input');check.type='checkbox';const item=cfg.items.find(i=>i.type===type);check.checked=!!item;const text=document.createElement('span');text.textContent=spec.icon+' '+spec.name;const price=document.createElement('input');price.type='number';price.min=0;price.max=9999;price.value=item?.price??spec.price;price.setAttribute('aria-label','Precio de '+spec.name);const qty=document.createElement('input');qty.type='number';qty.min=1;qty.max=type==='hook'?20:100;qty.value=item?.qty??spec.qty;qty.setAttribute('aria-label',type==='hook'?'Alcance del gancho en cuadros':'Cantidad de '+spec.name);row.append(check,text,price,qty);body.appendChild(row);rows.push({type,check,price,qty});}$('shopEditModal').classList.remove('hidden');$('shopEditApply').onclick=()=>{const data={style:style.value,items:rows.filter(r=>r.check.checked).map(r=>({type:r.type,price:clamp(Math.floor(+r.price.value||0),0,9999),qty:clamp(Math.floor(+r.qty.value||1),1,r.type==='hook'?20:100)}))},tile='shop:'+encodeURIComponent(JSON.stringify(data));if(ref)ref.write(tile);else board[position.y][position.x]=tile;$('shopEditModal').classList.add('hidden');afterEdit();};}
+
 function deleteEditorObject(ref){if(!ref)return;if(ref.zone)darkZones=darkZones.filter(z=>z!==ref.zone);else if(ref.delete)ref.delete();else if(ref.board){const b=base(ref.read()),id=tileId(ref.read());if(b==='stairs'){removeStairsAt(ref.pos().x,ref.pos().y);}else if(b==='blinkboss'||b==='blinkpad'){removeBlinkFamily(id);}else if(['bossdoor','bosskey'].includes(b)){removeById('bossdoor',id);removeById('bosskey',id);}else if(['wd','ftorch','wspawn','remwall'].includes(b))removeGroup(id);else if(['cbtn','cspawn'].includes(b))removeCreator(id);else if(['portal','portal2','ddoor','diamond','rdoor','rdiamond','doubleDoor','closeBtn','openBtn'].includes(b)){const family=['portal','portal2'].includes(b)?['portal','portal2']:['ddoor','diamond'].includes(b)?['ddoor','diamond']:['rdoor','rdiamond'].includes(b)?['rdoor','rdiamond']:['doubleDoor','closeBtn','openBtn'];family.forEach(k=>removeById(k,id));}else ref.write('floor');}else ref.write('floor');$('objectMiniMenu').classList.add('hidden');afterEdit();setStatus('🗑 Objeto borrado. Puedes deshacer.',1600);}
 
 function newLocalId(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);}
@@ -4767,7 +4772,7 @@ function reserveWizardZone(){const ids=new Set([nextEditorZoneId()-1,...darkZone
 function cleanZoneSwitches(){const ids=new Set(darkZones.map(z=>z.id));walkRewards(t=>{if(base(t)==='darkzone')try{const c=JSON.parse(decodeURIComponent(part(t,1)));if(c.id)ids.add(c.id);}catch(e){}});if(pending?.type==='zoneSwitch')ids.add(pending.zoneId);for(const row of board)for(let i=0;i<row.length;i++)if(base(row[i])==='lightswitch'&&!ids.has(tileId(row[i])))row[i]='floor';}
 
 let gestureInput=null;
-function startGesture(id,x,y,type='touch'){if(controlPrefs.mode!==3||!G||G.paused||G.over||y<window.innerHeight/2||gestureInput)return false;gestureInput={id,x,y,cx:x,cy:y,type};touchDir=null;return true;}
+function startGesture(id,x,y,type='touch'){if(controlPrefs.mode!==3&&!freeMovement12||!G||G.paused||G.over||y<window.innerHeight/2||gestureInput)return false;gestureInput={id,x,y,cx:x,cy:y,type};touchDir=null;return true;}
 function moveGesture(id,x,y){const a=gestureInput;if(!a||a.id!==id)return;a.cx=x;a.cy=y;const dx=x-a.x,dy=y-a.y,dir=Math.hypot(dx,dy)<18?null:Math.abs(dx)>Math.abs(dy)?(dx<0?'L':'R'):(dy<0?'U':'D');if(dir&&dir!==touchDir)primeDirection(dir);touchDir=dir;if(!dir&&G)G.turnInput=null;}
 function endGesture(id){if(gestureInput?.id!==id)return;cancelGesture();suppressCenterClickUntil=performance.now()+700;}
 function cancelGesture(){gestureInput=null;touchDir=null;}
@@ -4775,7 +4780,7 @@ function modeThreeAttack(kind,dir){if(controlPrefs.useObjectButton)return;if(!G|
 function gestureTouchStart(e){initAudio();if(!G||G.paused||G.over)return;for(const t of e.changedTouches){if(t.clientY>=window.innerHeight/2)startGesture(t.identifier,t.clientX,t.clientY);else if(!centerTouch)centerTouch={id:t.identifier,sx:t.clientX,sy:t.clientY,fired:false,since:G.time};}}
 function gestureTouchMove(e){if(!G)return;for(const t of e.changedTouches){if(gestureInput?.id===t.identifier){moveGesture(t.identifier,t.clientX,t.clientY);continue;}if(centerTouch?.id===t.identifier&&!centerTouch.fired){const dx=t.clientX-centerTouch.sx,dy=t.clientY-centerTouch.sy;if(Math.hypot(dx,dy)>30){centerTouch.fired=true;modeThreeAttack('bow',Math.abs(dx)>Math.abs(dy)?(dx<0?'L':'R'):(dy<0?'U':'D'));}}}}
 function gestureTouchEnd(e){for(const t of e.changedTouches){if(gestureInput?.id===t.identifier)endGesture(t.identifier);if(centerTouch?.id===t.identifier){if(!centerTouch.fired&&e.type!=='touchcancel')modeThreeAttack('sword');centerTouch=null;suppressCenterClickUntil=performance.now()+700;}}}
-function drawGestureStick(){const a=gestureInput;if(controlPrefs.mode!==3||!a)return;ctx.save();ctx.globalAlpha=controlPrefs.opacity;ctx.strokeStyle='#e4f0ff';ctx.fillStyle='#173956';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a.x,a.y,48,0,Math.PI*2);ctx.fill();ctx.stroke();const dx=a.cx-a.x,dy=a.cy-a.y,scale=Math.min(1,42/Math.max(1,Math.hypot(dx,dy)));ctx.beginPath();ctx.arc(a.x+dx*scale,a.y+dy*scale,15,0,Math.PI*2);ctx.fillStyle='#d7eaff';ctx.fill();ctx.restore();}
+function drawGestureStick(){const a=gestureInput;if(controlPrefs.mode!==3&&!freeMovement12||!a)return;ctx.save();ctx.globalAlpha=controlPrefs.opacity;ctx.strokeStyle='#e4f0ff';ctx.fillStyle='#173956';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a.x,a.y,48,0,Math.PI*2);ctx.fill();ctx.stroke();const dx=a.cx-a.x,dy=a.cy-a.y,scale=Math.min(1,42/Math.max(1,Math.hypot(dx,dy)));ctx.beginPath();ctx.arc(a.x+dx*scale,a.y+dy*scale,15,0,Math.PI*2);ctx.fillStyle='#d7eaff';ctx.fill();ctx.restore();}
 function queueWallContact(w){if(!G)return;G.wallContactQueue.push({x:w.x,y:w.y,t:G.grid[w.y][w.x]});}
 function flushWallContacts(){const g=G;if(!g||g.processingWallContacts||!g.wallContactQueue.length)return;g.processingWallContacts=true;const seen=new Set();try{let limit=256;while(g.wallContactQueue.length&&limit--){const q=g.wallContactQueue.shift(),key=q.x+','+q.y+','+q.t;if(seen.has(key))continue;seen.add(key);if(g.grid[q.y]?.[q.x]!==q.t)continue;if(['btn','mwbtn','switch','crossbtn','openBtn','closeBtn','cbtn','lightswitch','boxCreator'].includes(base(q.t)))stepOnButton(q.x,q.y);}g.wallContactQueue.length=0;computeHolds();}finally{g.processingWallContacts=false;}}
 function setupModeThree(){GUIDE_DETAILS.torch='La antorcha ilumina. Pulsa 🔥 para lanzar una flama hacia donde mira el personaje y encender antorchas o derretir hielo.';GUIDE_DETAILS.ftorch='Enciéndela lanzando una flama desde una casilla contigua.';GUIDE_DETAILS.ice='Solo se derrite cuando le lanzas fuego con la antorcha.';GUIDE_DETAILS.shop='Acércate y mantén la dirección hacia la tienda para entrar.';GUIDE_DETAILS.enemy3+=' Puede construir sobre objetos; al romper la barrera reaparecen. Si otro constructor ocupa su destino, retrocede y construye una casilla antes.';GUIDE_DETAILS.switch+=' También puede presionarlo una pared movible.';GUIDE_DETAILS.ftorch+=' Ocupa su casilla: debes encenderla desde un lado.';GUIDE_DETAILS.torchdecor='Antorcha encendida con intensidad configurable. Ilumina la oscuridad y bloquea el paso.';Object.assign(TOOL_NOTES,GUIDE_DETAILS);window.addEventListener('pointerup',e=>{if(gestureInput?.type==='mouse')endGesture(e.pointerId);});window.addEventListener('blur',cancelGesture);}
@@ -5478,7 +5483,7 @@ setupModeThree();
         for(const p of [...editorPlatforms,...(pending?.type==='platformRoute'?[pending.cfg]:[])]){for(const [i,q]of p.path.entries()){const cell=editorCellAt(q.x,q.y);if(cell){const a=document.createElement('span');a.className='route-mark';a.textContent=String(i);cell.append(a);}}for(const c of platformCells(p)){const cell=editorCellAt(c.x,c.y);if(cell){const a=document.createElement('span');a.className='platform-mark';cell.append(a);}}}}
     function geometryRefAt(x,y){const p=editorPlatforms.find(p=>platformCells(p).some(c=>c.x===x&&c.y===y));if(p)return{geometry:'platform',config:p,pos:()=>({x:p.x,y:p.y}),read:()=> 'platform',delete:()=>editorPlatforms=editorPlatforms.filter(q=>q!==p)};const e=editorEdges.find(e=>e.x===x&&e.y===y);if(e)return{geometry:e.kind,config:e,pos:()=>({x:e.x,y:e.y}),read:()=>e.kind,delete:()=>editorEdges=editorEdges.filter(q=>q!==e)};return null;}
     function editGeometry(ref){const cfg=ref.config;$('objectMiniMenu').classList.add('hidden');$('objectEditTitle').textContent=TOOL_LABELS[ref.geometry];const box=$('objectEditFields');box.innerHTML='';const values=ref.geometry==='platform'?{platformSize:cfg.size,platformWait:cfg.wait}:{edgeSide:cfg.side,edgeBehavior:cfg.behavior,channel:cfg.channel,crossReturn:cfg.cross?.returnType||'action',mode:cfg.cross?.mode||'tap',channelEnabled:cfg.channelEnabled!==false,edgeSlide:cfg.slide||'none',edgeTravel:cfg.travel||1,edgeDesign:cfg.design||'classic'};buildControls(box,TOOL_PARAMS[ref.geometry],values);$('objectEditReward').classList.add('hidden');$('objectEditRebuild').classList.toggle('hidden',ref.geometry!=='platform'&&!(ref.geometry==='thinDoor'&&cfg.behavior==='cross'));$('objectEditRebuild').onclick=()=>{Object.assign(brush,values);$('objectEditModal').classList.add('hidden');if(ref.geometry==='platform')startPlatformRoute(cfg.x,cfg.y,cfg);else configureThinCross({...cfg,side:values.edgeSide,behavior:'cross',channel:+values.channel,channelEnabled:values.channelEnabled!==false,design:values.edgeDesign||'classic'},cfg);};$('objectEditApply').onclick=()=>{if(ref.geometry==='platform'){const size=+values.platformSize===4?4:1;if(!cfg.path.every(q=>editorPlatformValid({...cfg,size},q,cfg))){setStatus('La nueva plataforma no cabe en todo el recorrido.',2000);return;}cfg.size=size;cfg.wait=+values.platformWait;}else{const trial={...cfg,side:values.edgeSide};const ends=edgeEnds(trial);if(ends.some(q=>q.x<0||q.x>=floorSize||q.y<0||q.y>=GRID_SIZE||q.y%editorStride()>=floorSize)||editorEdges.some(e=>e!==cfg&&sameEdge(e,trial))){setStatus('Ese borde está ocupado o fuera del piso.',1700);return;}if(values.edgeBehavior==='cross'&&(!cfg.cross||cfg.cross.returnType!==values.crossReturn)){Object.assign(brush,values);$('objectEditModal').classList.add('hidden');configureThinCross({...cfg,side:values.edgeSide,behavior:'cross',channel:+values.channel,channelEnabled:values.channelEnabled!==false,design:values.edgeDesign||'classic'},cfg);return;}Object.assign(cfg,{design:values.edgeDesign||'classic',side:values.edgeSide,behavior:values.edgeBehavior,channel:+values.channel,channelEnabled:values.channelEnabled!==false,slide:ref.geometry==='thinWall'?(values.edgeSlide||'none'):'none',travel:clamp(+values.edgeTravel||1,1,20)});if(cfg.cross)cfg.cross.mode=values.mode;}$('objectEditModal').classList.add('hidden');afterEdit();};$('objectEditModal').classList.remove('hidden');}
-    function drawPlatforms(){const ts=cv.ts;for(const p of G.platforms||[]){const pos=platformPose(p);for(const c of platformCells(p,pos.x,pos.y)){ctx.fillStyle='#17202f';ctx.fillRect(c.x*ts+1,c.y*ts+3,ts-2,ts-2);drawOriginal('platform',(c.x+.5)*ts,(c.y+.5)*ts,ts);}const w=(p.size===4?2:1)*ts;ctx.strokeStyle='#c5e4de';ctx.lineWidth=ts*.025;ctx.strokeRect(pos.x*ts+2,pos.y*ts+2,w-4,w-4);}}
+    function drawPlatforms(){const ts=cv.ts;for(const p of G.platforms||[]){const pos=platformPose(p);for(const c of platformCells(p,pos.x,pos.y)){const hole=base(G.grid[c.y]?.[c.x])==='hole';ctx.fillStyle=hole?'#050505':'#17202f';ctx.fillRect(c.x*ts,c.y*ts,ts,ts);if(hole)drawPlatformOverHole14(c.x,c.y,ts);else drawOriginal('platform',(c.x+.5)*ts,(c.y+.5)*ts,ts);}const w=(p.size===4?2:1)*ts;ctx.strokeStyle='#c5e4de';ctx.lineWidth=ts*.025;ctx.strokeRect(pos.x*ts+2,pos.y*ts+2,w-4,w-4);}}
     function drawThinEdges(){const ts=cv.ts;for(const e of G.edges||[]){const horizontal=e.side==='U'||e.side==='D',pose=slidingEdgePose(e),x=pose.x+(e.side==='R'?1:0),y=pose.y+(e.side==='D'?1:0);ctx.save();ctx.translate(x*ts,y*ts);if(!horizontal)ctx.rotate(Math.PI/2);ctx.fillStyle='#111924';ctx.fillRect(0,-ts*.09,ts,ts*.2);ctx.fillStyle=e.kind==='thinWall'?'#8a98a0':'#d2b27b';ctx.fillRect(0,-ts*.075,ts*.12,ts*.15);ctx.fillRect(ts*.88,-ts*.075,ts*.12,ts*.15);if(edgeClosed(e)){ctx.fillStyle=e.kind==='thinWall'?'#657785':'#8b6040';ctx.fillRect(ts*.1,-ts*.055,ts*.8,ts*.11);ctx.strokeStyle='#bdc7bb';ctx.lineWidth=1;ctx.strokeRect(ts*.1,-ts*.055,ts*.8,ts*.11);}else{ctx.fillStyle='#8b6040';ctx.fillRect(ts*.1,-ts*.055,ts*.1,ts*.47);}ctx.restore();}}
 
     const webTool=document.createElement('button');webTool.className='tool-btn';webTool.dataset.tool='web';webTool.textContent='🕸️ Telaraña';webTool.onclick=()=>{if(pending)cancelPending();selectedTool='web';document.querySelectorAll('#toolbar .tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool==='web'));renderBrushPanel();};$('toolbar').append(webTool);TOOL_LABELS.web='🕸️ Telaraña';GUIDE_DETAILS.web='Ralentiza mucho tus pasos. Puedes romperla con espada, bomba o fuego.';
@@ -6522,12 +6527,12 @@ setupModeThree();
         const steps=Math.max(1,Math.ceil(speed*dt/.045));
         for(let i=0;i<steps;i++)for(const axis of ['x','y']){
             const amount=input[axis]*speed*dt/steps;if(!amount)continue;const dir=axis==='x'?(amount>0?'R':'L'):(amount>0?'D':'U');let nx=q.x+(axis==='x'?amount:0),ny=q.y+(axis==='y'?amount:0);
-            const guarded=guardPitMotion14(q,nx,ny,axis,input);if(!guarded)continue;if(guarded.enter){const ok=tryPlayerMove(guarded.enter);if(G!==g||g.over||g.paused)return;if(ok){delete p.freePose12;p.rx=p.x;p.ry=p.y;g.waterMoveUntil=0;return;}continue;}nx=guarded.x;ny=guarded.y;
-            const cx=Math.floor(nx+.5),cy=Math.floor(ny+.5),[dx,dy]=DIRS[dir],tx=p.x+dx,ty=p.y+dy;
-            const fits=freeFits12(nx,ny,false,.40,.23,q),cross=cx!==p.x||cy!==p.y,approaching=inb(tx,ty)&&Math.abs((axis==='x'?nx-p.x:ny-p.y))>.20&&(bt(tx,ty)==='hole'||isDeepWater(g,tx,ty))&&!isSwimming(g)&&!platformAt(tx,ty);
-            if(cross||!fits||approaching){
-                // A bump still reaches the existing push, door, water and hole logic.
-                if(!cross&&!g.actionHeld&&!approaching)continue;if(!cross&&g.actionHeld&&g.time<g.nextPlayer)continue;
+            const guarded=guardPitMotion14(q,nx,ny,axis,input);if(!guarded)continue;if(guarded.enter){q.x=guarded.x??q.x;q.y=guarded.y??q.y;const ok=tryPlayerMove(guarded.enter);if(G!==g||g.over||g.paused)return;if(ok){delete p.freePose12;p.rx=p.x;p.ry=p.y;g.waterMoveUntil=0;return;}continue;}nx=guarded.x;ny=guarded.y;
+            const cx=Math.floor(nx+.5),cy=Math.floor(ny+.5),[dx,dy]=DIRS[dir];
+            const fits=freeFits12(nx,ny,false,.40,.23,q),cross=cx!==p.x||cy!==p.y;
+            if(cross||!fits){
+                // A bump still reaches the existing push, door and mechanism logic.
+                if(!cross&&!g.actionHeld)continue;if(!cross&&g.actionHeld&&g.time<g.nextPlayer)continue;
                 if(!fits&&!g.actionHeld)continue;
                 const ox=p.x,oy=p.y,ok=tryPlayerMove(dir);if(G===g&&isSwimming(g))g.waterMoveUntil=0;
                 if(G!==g||g.over||g.paused)return;
@@ -6590,7 +6595,7 @@ setupModeThree();
         let x=0,y=0;for(const d of new Set(heldKeys)){x+=DIRS[d]?.[0]||0;y+=DIRS[d]?.[1]||0;}return vector8_13(x,y);
     };
     function resetFreePad13(){freeTouchVector13=null;freePointer13=null;freeTouchPointers13?.clear();if(typeof freePad13!=='undefined')for(const b of freePad13.querySelectorAll('button'))b.classList.remove('active');}
-    function syncFreePad13(){document.body.classList.toggle('free-eight13',freeMovement12);resetFreePad13();}
+    function syncFreePad13(){document.body.classList.toggle('free-eight13',freeMovement12);document.body.classList.toggle('gesture-controls',freeMovement12);resetFreePad13();}
     const setEight13=setFreeMovement12;setFreeMovement12=function(on){setEight13(on);syncFreePad13();};
     const clearEight13=clearLabInput;clearLabInput=function(){resetFreePad13();clearEight13();};
     const controlsEight13=applyControlPrefs;applyControlPrefs=function(){controlsEight13();syncFreePad13();};
@@ -6657,25 +6662,60 @@ setupModeThree();
         try{drawTile(x,y,sp);}finally{ctx.fillRect=fill;drawOriginal=art;drawWaterCell=water;colors.floor=oldFloor;ctx.restore();}
     };
 
-    // The support footprint follows the drawn feet, including neighboring pits.
-    // Merely walking alongside an edge never starts a fall or a water entry.
-    const FOOT14={half:.22,top:.25,bottom:.43};
+    // The support footprint follows the actual animated feet, not the whole sprite.
+    // Its horizontal width follows the character's drawn pose (front/back vs profile).
+    function footShape14(){
+        const p=G.player,walking=!!G.freeWalking12||Math.abs(p.x-p.rx)+Math.abs(p.y-p.ry)>.02;
+        const walk=walking?Math.sin(G.time/90):0,profile=p.facing==='L'||p.facing==='R';
+        return{half:profile?.125:.155,top:.29-Math.abs(walk)*.035,bottom:.42+Math.abs(walk)*.035};
+    }
     function unsafeEdge14(x,y){const g=G,p=g.player;if(!inb(x,y)||x===p.x&&y===p.y||platformAt(x,y)||blockAt(x,y)||g.boxBridges?.has(y*g.n+x))return false;const deep=isDeepWater(g,x,y);return deep?!isSwimming(g):bt(x,y)==='hole';}
-    function feetHits14(x,y){const hits=[];for(let yy=Math.floor(y+FOOT14.top+.5);yy<=Math.floor(y+FOOT14.bottom+.5-.00001);yy++)for(let xx=Math.floor(x-FOOT14.half+.5);xx<=Math.floor(x+FOOT14.half+.5-.00001);xx++)if(unsafeEdge14(xx,yy))hits.push({x:xx,y:yy});return hits;}
+    function feetHits14(x,y){const f=footShape14(),hits=[];for(let yy=Math.floor(y+f.top+.5);yy<=Math.floor(y+f.bottom+.5-.00001);yy++)for(let xx=Math.floor(x-f.half+.5);xx<=Math.floor(x+f.half+.5-.00001);xx++)if(unsafeEdge14(xx,yy))hits.push({x:xx,y:yy});return hits;}
     function guardPitMotion14(q,nx,ny,axis,input){
-        const g=G,p=g.player;if(g.hookAction||g.doorTransit||standingOnBox(g)||platformAt(p.x,p.y)?.motion)return{x:nx,y:ny};
-        const hits=feetHits14(nx,ny);if(!hits.length)return{x:nx,y:ny};
-        for(const hole of hits){const dx=hole.x-p.x,dy=hole.y-p.y;
-            if(Math.abs(dx)+Math.abs(dy)===1&&((dx&&Math.sign(input.x)===dx)||(dy&&Math.sign(input.y)===dy))){
-                const dir=dx?(dx>0?'R':'L'):(dy>0?'D':'U');return{enter:dir};
+        const g=G,p=g.player;
+        if(g.hookAction||g.doorTransit||standingOnBox(g)||platformAt(p.x,p.y)?.motion)return{x:nx,y:ny};
+
+        // The real entry remains handled by normal movement (including its dwell timer).
+        // Touching the side of a neighboring tile must not count as entering it.
+        const dx=axis==='x'?Math.sign(nx-q.x):0,dy=axis==='y'?Math.sign(ny-q.y):0;
+        const tx=p.x+dx,ty=p.y+dy;
+        const f=footShape14(),eps=.000001;
+        if(dx||dy){
+            const hazard=inb(tx,ty)&&(bt(tx,ty)==='hole'||isDeepWater(g,tx,ty));
+            if(hazard&&!isSwimming(g)&&!platformAt(tx,ty)){
+                // Trigger the normal entry/dwell only when the DRAWN feet reach
+                // the boundary. The old 0.20-tile center threshold left a visible gap.
+                const edge=axis==='x'?p.x+(dx>0?.5:-.5):p.y+(dy>0?.5:-.5);
+                const reaches=dx>0?nx+f.half>=edge-eps:dx<0?nx-f.half<=edge+eps:dy>0?ny+f.bottom>=edge-eps:ny+f.top<=edge+eps;
+                if(reaches){let x=nx,y=ny;if(dx>0)x=Math.min(x,edge-f.half);else if(dx<0)x=Math.max(x,edge+f.half);else if(dy>0)y=Math.min(y,edge-f.bottom);else y=Math.max(y,edge-f.top);return{enter:dx?(dx>0?'R':'L'):(dy>0?'D':'U'),x,y};}
             }
-            // Slide parallel to the rim, correcting only the perpendicular axis.
-            if(axis==='x'&&hole.y!==p.y)ny=hole.y>p.y?Math.min(ny,hole.y-.5-FOOT14.bottom):Math.max(ny,hole.y+.5-FOOT14.top);
-            else if(axis==='y'&&hole.x!==p.x)nx=hole.x>p.x?Math.min(nx,hole.x-.5-FOOT14.half):Math.max(nx,hole.x+.5+FOOT14.half);
-            else return null;
         }
-        if(feetHits14(nx,ny).length||!freeFits12(nx,ny,false,.40,.23,q))return null;
-        return{x:nx,y:ny};
+
+        const overlap=(x,y,hx,hy)=>{
+            const w=Math.max(0,Math.min(x+f.half,hx+.5)-Math.max(x-f.half,hx-.5));
+            const h=Math.max(0,Math.min(y+f.bottom,hy+.5)-Math.max(y+f.top,hy-.5));
+            return w*h;
+        };
+        // Compare the footprint with the UNION of dangerous tiles. Looking at each
+        // tile independently caused a snag when contact transferred to its neighbor.
+        const hazards=[];
+        const minX=Math.floor(Math.min(q.x,nx)-f.half-.5),maxX=Math.floor(Math.max(q.x,nx)+f.half+.5);
+        const minY=Math.floor(Math.min(q.y,ny)+f.top-.5),maxY=Math.floor(Math.max(q.y,ny)+f.bottom+.5);
+        for(let hy=minY;hy<=maxY;hy++)for(let hx=minX;hx<=maxX;hx++)if(unsafeEdge14(hx,hy))hazards.push({x:hx,y:hy});
+        if(!hazards.length)return{x:nx,y:ny};
+        const total=(x,y)=>{let sum=0;for(const h of hazards)sum+=overlap(x,y,h.x,h.y);return sum;};
+        const before=total(q.x,q.y),after=total(nx,ny);
+        if(after<=before+eps)return{x:nx,y:ny};
+
+        // Stop at the precise union boundary only when total contact grows.
+        // Tangential movement along a continuous water/hole edge remains smooth.
+        let lo=0,hi=1;
+        for(let i=0;i<20;i++){
+            const t=(lo+hi)/2,x=q.x+(nx-q.x)*t,y=q.y+(ny-q.y)*t;
+            if(total(x,y)<=before+eps)lo=t;else hi=t;
+        }
+        if(lo<.0001)return null;
+        return{x:q.x+(nx-q.x)*lo,y:q.y+(ny-q.y)*lo};
     }
 
     // Each finger owns its control. Secondary touch presses act immediately,
@@ -6723,6 +6763,106 @@ setupModeThree();
     updateWarn();
     history=[snap()];historyIndex=0;refreshHistory();
     window.addEventListener('resize', () => { if (!G) renderGrid(); });
+    // Las rocas pueden guardar una recompensa configurable.
+    PSPEC.rockReward={t:'select',label:'Contenido de la roca',options:[['none','Vacía'],['heart','Corazón'],['cash','Monedas'],['key','Llave'],['bomb','Bomba'],['ammo','Flechas'],['shield','Escudo'],['sword','Espada'],['bow','Arco'],['fins','Aletas'],['torch','Antorcha'],['antidote','Antídoto']]};
+    if(!TOOL_PARAMS.rock.includes('rockReward'))TOOL_PARAMS.rock.push('rockReward');
+    const valuesRockBefore14=valuesForObject;valuesForObject=function(ref){const values=valuesRockBefore14(ref),token=ref.read();if(base(token)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(token,1)));values.rockReward=cfg.reward||'none';}catch{values.rockReward='none';}}return values;};
+    const tileFromToolBeforeRock=tileFromTool;
+    tileFromTool=function(tool,st){if(tool==='rock'){const reward=st.rockReward||'none';return 'rock:'+encodeURIComponent(JSON.stringify({reward,amount:reward==='cash'?5:1}));}return tileFromToolBeforeRock(tool,st);};
+    const explodeBeforeRockLoot=explode;
+    explode=function(b){const g=G,loot=[];if(g)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=b.x+dx,y=b.y+dy,t=g.grid[y]?.[x];if(inb(x,y)&&base(t)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(t,1)));if(cfg.reward&&cfg.reward!=='none')loot.push({x,y,reward:cfg.reward,amount:cfg.amount||1});}catch{}}}explodeBeforeRockLoot(b);for(const q of loot){const obj=['cash','ammo','bomb','antidote'].includes(q.reward)?q.reward+':'+q.amount:q.reward;spawnObject(obj,q.x,q.y);}};
+    // Ajustes finales de interacción y presentación.
+    const finalPolishStyle=document.createElement('style');finalPolishStyle.textContent=`
+      .room-music-box,#enableRoomMusic,#setupMusicFile,#setupMusicName,#setupMusicRemove{display:none!important}
+      body.free-eight13 #freeMovePad13{display:none!important}
+      body.free-eight13 #mobileArrows{display:none!important}
+    `;document.head.append(finalPolishStyle);
+    // No se conserva una interfaz para añadir canciones a nuevos cuartos.
+    if($('editorMusicFile'))$('editorMusicFile').closest('.room-music-box')?.remove();
+    if($('setupMusicFile'))$('setupMusicFile').closest('.room-music-box')?.remove();
+    let editorBridges14=[],bridgeDraft14=null;
+    const bridgeToolNames14={bridgeWater:'Puente de madera sobre agua',bridge:'Puente de madera · cualquier piso'};
+    Object.assign(ICONS,{bridgeWater:'🌉',bridge:'🪵'});
+    for(const[tool,label]of Object.entries(bridgeToolNames14))addAquaticTool(tool,label);
+    const bridgeToolButtons14=[...document.querySelectorAll('#toolbar .tool-btn')].filter(b=>Object.hasOwn(bridgeToolNames14,b.dataset.tool));
+    for(const button of bridgeToolButtons14)button.onclick=()=>{if(pending)cancelPending();bridgeDraft14=null;selectedTool=button.dataset.tool;document.querySelectorAll('#toolbar .tool-btn').forEach(el=>el.classList.toggle('active',el===button));renderBrushPanel();setStatus('Coloca los dos extremos en línea recta; el puente se dibujará automáticamente.',3500);};
+    Object.assign(GUIDE_DETAILS,{
+        bridgeWater:'Coloca los dos extremos en línea recta, de orilla a orilla sobre agua u hoyos. El puente de tablones deja ver el agua; si ya vienes nadando, puedes pasar por debajo.',
+        bridge:'Coloca los dos extremos en línea recta sobre piso, agua u hoyos. El puente deja ver el terreno y permite nadar por debajo si ya estabas nadando.'
+    });
+    Object.assign(TOOL_NOTES,GUIDE_DETAILS);
+    const bridgeStyle14=document.createElement('style');bridgeStyle14.textContent='.cell.bridge-route{box-shadow:inset 0 0 0 4px #a97a4e!important}.cell.bridge-endpoint:after{content:\"⚓\";position:absolute;right:1px;bottom:0;font-size:12px;z-index:7;pointer-events:none}.cell.bridge-route.bridge-water{box-shadow:inset 0 0 0 4px #66c8e8!important}';document.head.append(bridgeStyle14);
+    function bridgeAtEditor14(x,y){return editorBridges14.find(b=>b.path.some(c=>c.x===x&&c.y===y))||null;}
+    function bridgeAt14(g,x,y){return g?.bridges?.find(b=>b.path.some(c=>c.x===x&&c.y===y))||null;}
+    function bridgeCells14(a,b){const dx=Math.sign(b.x-a.x),dy=Math.sign(b.y-a.y),steps=Math.abs(b.x-a.x)+Math.abs(b.y-a.y);return Array.from({length:steps+1},(_,i)=>({x:a.x+dx*i,y:a.y+dy*i}));}
+    function validateBridges14(input){
+        const bridges=input.bridges||[];if(!Array.isArray(bridges)||bridges.length>100)throw Error('Puentes inválidos.');
+        const used=new Set(),size=+input.floorSize||+input.gridSize,stride=size+2;
+        return bridges.map(source=>{
+            if(!source||!['water','any'].includes(source.kind)||!Array.isArray(source.path)||source.path.length<2||source.path.length>21)throw Error('Puente inválido.');
+            const path=source.path.map(p=>({x:+p?.x,y:+p?.y})),first=path[0],last=path[path.length-1],axis=first.x===last.x?'vertical':first.y===last.y?'horizontal':null;
+            if(!axis||first.x===last.x&&first.y===last.y||path.some((p,i)=>!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.x>=size||p.y<0||p.y>=+input.gridSize||p.y%stride>=size||Math.floor(p.y/stride)!==Math.floor(first.y/stride)||i&&Math.abs(p.x-path[i-1].x)+Math.abs(p.y-path[i-1].y)!==1))throw Error('El puente debe ser recto y permanecer dentro del mismo piso.');
+            if(path.length!==Math.abs(last.x-first.x)+Math.abs(last.y-first.y)+1||path.some((p,i)=>i>0&&((axis==='horizontal'&&p.y!==first.y)||(axis==='vertical'&&p.x!==first.x))))throw Error('El recorrido del puente está incompleto.');
+            let hasWater=false;for(const[i,p]of path.entries()){const key=p.x+','+p.y,t=input.board?.[p.y]?.[p.x],b=base(t),endpoint=i===0||i===path.length-1,valid=source.kind==='water'?(endpoint?['floor','water','hole'].includes(b):['water','hole'].includes(b)):['floor','water','hole','shallowWater'].includes(b);if(used.has(key))throw Error('Dos puentes no pueden ocupar la misma casilla.');used.add(key);if(!valid)throw Error('El puente no coincide con el terreno permitido.');if(['water','hole'].includes(b))hasWater=true;}if(source.kind==='water'&&!hasWater)throw Error('El puente sobre agua debe cruzar agua u hoyos.');
+            return{id:String(source.id||newLocalId('bridge')),kind:source.kind,path};
+        });
+    }
+    function drawBridgeCell14(bridge,cell){
+        const ts=cv.ts,x=cell.x*ts,y=cell.y*ts,horizontal=bridge.path[0].y===bridge.path.at(-1).y;
+        ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+        ctx.strokeStyle='rgba(57,38,27,.88)';ctx.lineWidth=ts*.11;
+        ctx.beginPath();if(horizontal){ctx.moveTo(x+ts*.08,y+ts*.30);ctx.lineTo(x+ts*.92,y+ts*.30);ctx.moveTo(x+ts*.08,y+ts*.70);ctx.lineTo(x+ts*.92,y+ts*.70);}else{ctx.moveTo(x+ts*.30,y+ts*.08);ctx.lineTo(x+ts*.30,y+ts*.92);ctx.moveTo(x+ts*.70,y+ts*.08);ctx.lineTo(x+ts*.70,y+ts*.92);}ctx.stroke();
+        const start=bridge.path[0],end=bridge.path.at(-1);
+        for(let i=0;i<5;i++){const pos=(i+.5)/5;ctx.fillStyle=i%2?'rgba(181,129,76,.88)':'rgba(145,96,55,.88)';if(horizontal)ctx.fillRect(x+pos*ts-ts*.045,y+ts*.18,ts*.09,ts*.64);else ctx.fillRect(x+ts*.18,y+pos*ts-ts*.045,ts*.64,ts*.09);}
+        if(cell.x===start.x&&cell.y===start.y||cell.x===end.x&&cell.y===end.y){ctx.fillStyle='#59402d';const cx=x+ts/2,cy=y+ts/2;for(const sign of [-1,1]){if(horizontal)ctx.fillRect(cx+sign*ts*.30-ts*.035,y+ts*.14,ts*.07,ts*.72);else ctx.fillRect(x+ts*.14,cy+sign*ts*.30-ts*.035,ts*.72,ts*.07);}ctx.fillStyle='#d5b17b';ctx.beginPath();ctx.arc(cx,cy,ts*.055,0,Math.PI*2);ctx.fill();}
+        ctx.restore();
+    }
+    function drawPlatformOverHole14(x,y,ts){
+        ctx.save();ctx.fillStyle='#050505';ctx.fillRect(x*ts,y*ts,ts,ts);ctx.fillStyle='rgba(145,96,55,.92)';ctx.strokeStyle='#49372b';ctx.lineWidth=ts*.035;
+        for(let i=0;i<4;i++){const py=y*ts+ts*(.13+i*.22);ctx.fillRect(x*ts+ts*.08,py,ts*.84,ts*.13);ctx.strokeRect(x*ts+ts*.08,py,ts*.84,ts*.13);}
+        ctx.restore();
+    }
+    function markBridgeEditor14(){
+        for(const bridge of editorBridges14)for(const[cellIndex,cell]of bridge.path.entries()){const el=editorCellAt(cell.x,cell.y);if(!el)continue;el.classList.add('bridge-route');if(bridge.kind==='water')el.classList.add('bridge-water');if(cellIndex===0||cellIndex===bridge.path.length-1)el.classList.add('bridge-endpoint');el.title+=(el.title?' · ':'')+(bridge.kind==='water'?'Puente sobre agua':'Puente de madera')+(cellIndex===0||cellIndex===bridge.path.length-1?' · entrada / salida':'');}
+        if(bridgeDraft14){const el=editorCellAt(bridgeDraft14.x,bridgeDraft14.y);el?.classList.add('bridge-endpoint');}
+    }
+    const renderGridBridge14=renderGrid;renderGrid=function(){renderGridBridge14();markBridgeEditor14();};
+    const handleCellBridge14=handleCellClick;handleCellClick=function(x,y){
+        if(!pending&&!wizard&&!objectMove&&['bridgeWater','bridge'].includes(selectedTool)){
+            const cell={x,y},terrain=base(board[y]?.[x]),isWater=selectedTool==='bridgeWater',allowed=isWater?['floor','water','hole']:['floor','water','hole','shallowWater'];
+            if(!allowed.includes(terrain)){setStatus(isWater?'Elige la orilla, agua o un hoyo para el extremo.':'Elige piso, agua u hoyos libres para el puente.',2200);return;}
+            if(!bridgeDraft14){bridgeDraft14=cell;renderGrid();setStatus('Primer extremo colocado. Ahora elige el otro extremo en línea recta.',2600);return;}
+            if(bridgeDraft14.y!==y&&bridgeDraft14.x!==x){setStatus('Los extremos deben quedar en una misma fila o columna.',2000);return;}
+            const path=bridgeCells14(bridgeDraft14,cell);if(path.length<2||path.length>21){setStatus('El puente debe medir entre 1 y 20 casillas.',2000);return;}
+            const floorA=Math.floor(bridgeDraft14.y/editorStride()),floorB=Math.floor(y/editorStride());
+            const crossesWater=path.some((p,i)=>{const b=base(board[p.y]?.[p.x]);return isWater?(i===0||i===path.length-1?['water','hole'].includes(b):['water','hole'].includes(b)):['water','hole'].includes(b);});
+            if(floorA!==floorB||path.some((p,i)=>!(isWater?(i===0||i===path.length-1?allowed.includes(base(board[p.y]?.[p.x])):['water','hole'].includes(base(board[p.y]?.[p.x]))):allowed.includes(base(board[p.y]?.[p.x])))||bridgeAtEditor14(p.x,p.y))||isWater&&!crossesWater){setStatus('Todo el puente debe caber sobre terreno libre permitido del mismo piso.',2400);return;}
+            editorBridges14.push({id:newLocalId('bridge'),kind:isWater?'water':'any',path});bridgeDraft14=null;afterEdit();setStatus('Puente listo. Usa Borrar sobre el puente para quitarlo.',2300);return;
+        }
+        return handleCellBridge14(x,y);
+    };
+    const geometryBridge14=geometryRefAt;geometryRefAt=function(x,y){const bridge=bridgeAtEditor14(x,y);if(bridge)return{geometry:'bridge',bridge14:bridge,pos:()=>({...bridge.path[0]}),read:()=>bridge.kind==='water'?'bridgeWater':'bridge',delete:()=>editorBridges14=editorBridges14.filter(q=>q!==bridge)};return geometryBridge14(x,y);};
+    const openObjectBridge14=openObjectMenu;openObjectMenu=function(x,y){const bridge=bridgeAtEditor14(x,y);if(!bridge)return openObjectBridge14(x,y);objectMenuRef={geometry:'bridge',bridge14:bridge,pos:()=>({...bridge.path[0]}),read:()=>bridge.kind==='water'?'bridgeWater':'bridge',delete:()=>editorBridges14=editorBridges14.filter(q=>q!==bridge)};$('objectMenuTitle').textContent=TOOL_LABELS[objectMenuRef.read()];$('objectMenuMove').hidden=true;$('objectMiniMenu').classList.remove('hidden');};
+    const objectEditorBridgeBefore14=openObjectEditor;openObjectEditor=function(ref){if(!ref?.bridge14)return objectEditorBridgeBefore14(ref);$('objectMiniMenu').classList.add('hidden');$('objectEditTitle').textContent=TOOL_LABELS[ref.read()];const first=ref.bridge14.path[0],last=ref.bridge14.path.at(-1),horizontal=first.y===last.y;const fields=$('objectEditFields');fields.replaceChildren();const info=document.createElement('p');info.textContent=`Puente de ${ref.bridge14.path.length} casillas, en dirección ${horizontal?'horizontal':'vertical'}. Los extremos funcionan como entrada y salida. Usa Borrar para quitarlo.`;fields.append(info);$('objectEditReward').classList.add('hidden');$('objectEditRebuild').classList.add('hidden');$('objectEditApply').onclick=()=>$('objectEditModal').classList.add('hidden');$('objectEditModal').classList.remove('hidden');};
+    const openObjectBridgeMenuBefore14=openObjectMenu;openObjectMenu=function(x,y){if(!bridgeAtEditor14(x,y))$('objectMenuMove').hidden=false;return openObjectBridgeMenuBefore14(x,y);};
+    const deleteBridgeBefore14=deleteEditorObject;deleteEditorObject=function(ref){if(ref?.bridge14){ref.delete();$('objectMiniMenu').classList.add('hidden');afterEdit();setStatus('Puente borrado. Puedes deshacer.',1600);return;}return deleteBridgeBefore14(ref);};
+    const clearBridgeDraftBefore14=initEmptyBoard;initEmptyBoard=function(){bridgeDraft14=null;editorBridges14=[];return clearBridgeDraftBefore14();};
+    const snapBridgeBefore14=snap;snap=function(){const data=JSON.parse(snapBridgeBefore14());data.editorBridges14=clone(editorBridges14);return JSON.stringify(data);};
+    const restoreBridgeBefore14=restoreSnap;restoreSnap=function(value){const data=JSON.parse(value);editorBridges14=clone(data.editorBridges14||[]);bridgeDraft14=null;return restoreBridgeBefore14(value);};
+    const roomDataBridgeBefore14=currentRoomData;currentRoomData=function(){const data=roomDataBridgeBefore14();data.bridges=clone(editorBridges14);return data;};
+    const openDraftBridgeBefore14=openDraft;openDraft=function(d){const out=openDraftBridgeBefore14(d);editorBridges14=validateBridges14(d);renderGrid();return out;};
+    const resizeBridgeBefore14=resizeBoard;resizeBoard=function(size){if(editorBridges14.some(b=>b.path.some(p=>p.x>=size||p.y>=size))){gridSizeSelect.value=GRID_SIZE;setStatus('Primero borra o reubica los puentes que quedan fuera del nuevo tamaño.',2200);return;}return resizeBridgeBefore14(size);};
+    const validatedRoomBridgeBefore14=validatedRoom;validatedRoom=function(input,playable=true){const data=validatedRoomBridgeBefore14(input,playable);data.bridges=validateBridges14(input);return data;};
+    const setupRoomBridgeBefore14=setupRoom;setupRoom=function(room){const data=clone(room);data.bridges=validateBridges14(data);setupRoomBridgeBefore14(data);if(G){G.bridges=data.bridges;G.bridgeUnder14=false;updateWater(G,true);}};
+    const typeBridgeBefore14=bt,deepWaterBridgeBefore14=isDeepWater;bt=function(x,y){const g=G;if(g&&bridgeAt14(g,x,y)){if(g.bridgeUnder14&&deepWaterBridgeBefore14(g,x,y))return'water';return'floor';}return typeBridgeBefore14(x,y);};
+    isDeepWater=function(g,x,y){if(g&&bridgeAt14(g,x,y)&&g.player.x===x&&g.player.y===y&&!g.bridgeUnder14)return false;return deepWaterBridgeBefore14(g,x,y);};
+    const swimmingBridgeBefore14=isSwimming;isSwimming=function(g=G){if(g&&bridgeAt14(g,g.player.x,g.player.y))return !!g.bridgeUnder14;return swimmingBridgeBefore14(g);};
+    const moveBridgeBefore14=tryPlayerMove;tryPlayerMove=function(dir){const g=G;if(!g)return moveBridgeBefore14(dir);const p=g.player,wasUnder=!!g.bridgeUnder14,wasBridge=!!bridgeAt14(g,p.x,p.y),wasSwimming=isSwimming(g),oldX=p.x,oldY=p.y,ok=moveBridgeBefore14(dir);if(G===g&&ok){if(bridgeAt14(g,p.x,p.y))g.bridgeUnder14=wasBridge?wasUnder:wasSwimming;else g.bridgeUnder14=false;}else if(G===g&&(p.x!==oldX||p.y!==oldY))g.bridgeUnder14=false;return ok;};
+    const fallBridgeBefore14=fallPlayer;fallPlayer=function(){const g=G;if(g&&bridgeAt14(g,g.player.x,g.player.y)&&!g.bridgeUnder14)return;return fallBridgeBefore14();};
+    const safetyBridgeBefore14=checkWaterSafety;checkWaterSafety=function(){const g=G;if(g&&bridgeAt14(g,g.player.x,g.player.y)&&!g.bridgeUnder14)return;return safetyBridgeBefore14();};
+    const unsafeBridgeBefore14=unsafeEdge14;unsafeEdge14=function(x,y){if(G&&bridgeAt14(G,x,y)&&!(G.player.x===x&&G.player.y===y&&G.bridgeUnder14))return false;return unsafeBridgeBefore14(x,y);};
+    gestureTouchStart=function(e){initAudio();if(!G||G.paused||G.over)return;for(const t of e.changedTouches){if(t.clientY>=window.innerHeight/2)startGesture(t.identifier,t.clientX,t.clientY);else if(!centerTouch)centerTouch={id:t.identifier,sx:t.clientX,sy:t.clientY,fired:false,since:G.time};}};
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&bridgeDraft14){e.preventDefault();e.stopImmediatePropagation();bridgeDraft14=null;renderGrid();setStatus('Colocación del puente cancelada.',1300);}},true);
 })();
 </script>
 </body>
