@@ -3751,7 +3751,6 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
             if(depthTile12(x,y)){drawGround14(x,y);depth.push({y:y+.4,paint:()=>drawRaisedTile12(x,y,sp)});}else drawTile(x,y,sp);
         }
         drawPlatforms();drawBeams();
-        drawDarkness(depth);
         for(const bridge of g.bridges||[])for(const cell of bridge.path){const coversSwimmer=g.bridgeUnder14&&g.player.x===cell.x&&g.player.y===cell.y;depth.push({y:cell.y+(coversSwimmer?.5:.25),paint:()=>drawBridgeCell14(bridge,cell)});}
         drawCinemaGhost();
 
@@ -3832,6 +3831,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         const fallVisual=fallVisual14(g);depth.push({y:(fallVisual?.y??g.player.ry)+(g.bridgeAbove14?.98:.35),paint:()=>{const p=g.player,v=fallVisual||{x:p.rx,y:p.ry,scale:1,alpha:1},cx=(v.x+.5)*ts,cy=(v.y+.5)*ts-(standingOnBox(g)?ts*.28:0);ctx.save();ctx.globalAlpha=v.alpha;ctx.translate(cx,cy);ctx.scale(v.scale,v.scale);drawHeroTop(0,0,ts);ctx.restore();if(fallVisual?.kind==='water'&&fallVisual.progress>.45){ctx.save();ctx.globalAlpha=v.alpha;emoji('💦',cx-ts*.19,cy+ts*.18,ts*.18);emoji('💧',cx+ts*.2,cy+ts*.25,ts*.14);ctx.restore();}}});
         for(const edge of g.edges||[]){const pose=slidingEdgePose(edge);depth.push({y:pose.y+(edge.side==='D'?.9:edge.side==='U'?-.1:.4),paint:()=>drawThinEdges([edge])});}
         depth.sort((a,b)=>a.y-b.y);for(const item of depth)item.paint();
+        drawDarkness();
 
         g.effects = g.effects.filter(ef => (g.time - ef.t0) < (ef.dur || 400));
         for (const ef of g.effects) {
@@ -4151,13 +4151,13 @@ function drawDarkness(depthQueue=null){
  const g=G;if(!g.darkCells.size&&!g.zones.some(z=>!g.visitedZones.has(z.id)))return;const ts=cv.ts,bounds=floorBounds(g,cinemaFocus(g).y),size=Math.ceil(bounds.size*ts),offset=bounds.y*ts;
  if(!darknessCanvas)darknessCanvas=document.createElement('canvas');if(darknessCanvas.width!==size)darknessCanvas.width=size;if(darknessCanvas.height!==size)darknessCanvas.height=size;
  const mask=darknessCanvas.getContext('2d');mask.clearRect(0,0,size,size);mask.globalCompositeOperation='source-over';
- for(const key of g.darkCells){const x=key%g.n,y=Math.floor(key/g.n);if(y>=bounds.y&&y<bounds.y+bounds.size){mask.fillStyle=`rgba(2,3,10,${g.darkOpacity?.get(key)??.94})`;mask.fillRect(x*ts,y*ts-offset,ts+.5,ts+.5);}}
+ for(const key of g.darkCells){const x=key%g.n,y=Math.floor(key/g.n);if(y>=bounds.y&&y<bounds.y+bounds.size){mask.fillStyle=`rgba(2,3,10,${g.darkOpacity?.get(key)??.94})`;mask.fillRect(x*ts,y*ts-offset,ts+.5,ts+.5);if(y>bounds.y&&!g.darkCells.has(key-g.n))mask.fillRect(x*ts,y*ts-offset-ts*.65,ts+.5,ts*.65);}}
  mask.globalCompositeOperation='destination-out';
  const lights=[];for(let y=0;y<g.n;y++)for(let x=0;x<g.n;x++)if(isActiveGemAt(x,y))lights.push({x:x+.5,y:y+.5,r:1.1,power:.44});if(g.hasTorch)lights.push({x:g.player.rx+.5,y:g.player.ry+.5,r:3.1});
  for(const key of g.litTorches)lights.push({x:key%g.n+.5,y:Math.floor(key/g.n)+.5,r:2.7});
  for(let y=0;y<g.n;y++)for(let x=0;x<g.n;x++)if(base(g.grid[y][x])==='torchdecor'){const level=clamp(+part(g.grid[y][x],1)||5,1,10);lights.push({x:x+.5,y:y+.5,r:.7+.4*level,power:Math.min(1,.3+.14*level)});}
  for(const l of lights){if(l.y<bounds.y||l.y>=bounds.y+bounds.size)continue;const x=l.x*ts,y=l.y*ts-offset,r=l.r*ts*(1+.015*Math.sin(g.time/130+l.x));const grad=mask.createRadialGradient(x,y,r*.2,x,y,r);grad.addColorStop(0,`rgba(0,0,0,${l.power??1})`);grad.addColorStop(.65,`rgba(0,0,0,${.9*(l.power??1)})`);grad.addColorStop(1,'rgba(0,0,0,0)');mask.fillStyle=grad;mask.fillRect(x-r,y-r,2*r,2*r);}
- mask.globalCompositeOperation='source-over';mask.fillStyle='#02030a';for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id))for(const c of zoneCells(z,g.n))if(c.y>=bounds.y&&c.y<bounds.y+bounds.size)mask.fillRect(c.x*ts,c.y*ts-offset,ts+.5,ts+.5);
+ mask.globalCompositeOperation='source-over';mask.fillStyle='#02030a';for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id)){const cells=zoneCells(z,g.n),keys=new Set(cells.map(c=>c.y*g.n+c.x));for(const c of cells)if(c.y>=bounds.y&&c.y<bounds.y+bounds.size){mask.fillRect(c.x*ts,c.y*ts-offset,ts+.5,ts+.5);if(c.y>bounds.y&&!keys.has((c.y-1)*g.n+c.x))mask.fillRect(c.x*ts,c.y*ts-offset-ts*.65,ts+.5,ts*.65);}}
  if(depthQueue){const keys=new Set(g.darkCells);for(const z of g.zones)if(z.discover!==false&&!g.visitedZones.has(z.id))for(const c of zoneCells(z,g.n))keys.add(c.y*g.n+c.x);for(const key of keys){const x=key%g.n,y=Math.floor(key/g.n);if(y<bounds.y||y>=bounds.y+bounds.size)continue;depthQueue.push({y:y+.4,paint:()=>ctx.drawImage(darknessCanvas,x*ts,y*ts-offset,ts,ts,x*ts,y*ts,ts,ts)});}return;}
  ctx.drawImage(darknessCanvas,0,offset);
 }
