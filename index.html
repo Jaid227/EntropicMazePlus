@@ -3323,7 +3323,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
         const dt = Math.min(0.1, (ts - lastTs) / 1000 || 0.016);
         lastTs = ts;
         if(cinemaCurrent)advanceCinema(dt);
-        if (!G.paused && !G.over && !cinemaCurrent) update(dt);
+        if ((!G.paused || G.fallTransition) && !G.over && !cinemaCurrent) update(dt);
         if(G?.routeTravel&&!G.over&&!cinemaCurrent&&!G.paused)performRoomTravel();
         if (G && S.overlayKind!=='pause') { if(!cinemaCurrent&&!G.over)lerpAll(dt); draw(); updateHud(); }
         rafId = requestAnimationFrame(frame);
@@ -3824,12 +3824,12 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
             if(e.kind===3&&!e.awake)emoji('💤',cx,cy-ts*.6,ts*.3);
             if(e.kind===6&&e.buildSince!=null)emoji('🔨',cx,cy-ts*.6,ts*.32);
             if (e.hasKey) emoji('🔑', cx + ts * 0.32, cy - ts * 0.36, ts * 0.3);
-            if (e.state === 'chase') emoji('❗', cx, cy - ts * 0.78 + Math.sin(g.time / 120) * 2, ts * 0.4);
+            if (e.state === 'chase'&&!playerBridgeAbove14()) emoji('❗', cx, cy - ts * 0.78 + Math.sin(g.time / 120) * 2, ts * 0.4);
             if (g.time < e.stun && g.time >= e.flash && e.kind !== 3) emoji('💫', cx, cy - ts * 0.6, ts * 0.3);
             }});
         }
 
-        depth.push({y:g.player.ry+.35,paint:()=>{const p=g.player,cx=(p.rx+.5)*ts,cy=(p.ry+.5)*ts-(standingOnBox(g)?ts*.28:0);drawHeroTop(cx,cy,ts);}});
+        const fallVisual=fallVisual14(g);depth.push({y:(fallVisual?.y??g.player.ry)+(g.bridgeAbove14?.98:.35),paint:()=>{const p=g.player,v=fallVisual||{x:p.rx,y:p.ry,scale:1,alpha:1},cx=(v.x+.5)*ts,cy=(v.y+.5)*ts-(standingOnBox(g)?ts*.28:0);ctx.save();ctx.globalAlpha=v.alpha;ctx.translate(cx,cy);ctx.scale(v.scale,v.scale);drawHeroTop(0,0,ts);ctx.restore();if(fallVisual?.kind==='water'&&fallVisual.progress>.45){ctx.save();ctx.globalAlpha=v.alpha;emoji('💦',cx-ts*.19,cy+ts*.18,ts*.18);emoji('💧',cx+ts*.2,cy+ts*.25,ts*.14);ctx.restore();}}});
         for(const edge of g.edges||[]){const pose=slidingEdgePose(edge);depth.push({y:pose.y+(edge.side==='D'?.9:edge.side==='U'?-.1:.4),paint:()=>drawThinEdges([edge])});}
         depth.sort((a,b)=>a.y-b.y);for(const item of depth)item.paint();
 
@@ -6529,7 +6529,7 @@ setupModeThree();
             const amount=input[axis]*speed*dt/steps;if(!amount)continue;const dir=axis==='x'?(amount>0?'R':'L'):(amount>0?'D':'U');let nx=q.x+(axis==='x'?amount:0),ny=q.y+(axis==='y'?amount:0);
             const guarded=guardPitMotion14(q,nx,ny,axis,input);if(!guarded)continue;if(guarded.enter){q.x=guarded.x??q.x;q.y=guarded.y??q.y;const ok=tryPlayerMove(guarded.enter);if(G!==g||g.over||g.paused)return;if(ok){delete p.freePose12;p.rx=p.x;p.ry=p.y;g.waterMoveUntil=0;return;}continue;}nx=guarded.x;ny=guarded.y;
             const cx=Math.floor(nx+.5),cy=Math.floor(ny+.5),[dx,dy]=DIRS[dir];
-            const fits=freeFits12(nx,ny,false,.40,.23,q),cross=cx!==p.x||cy!==p.y;
+            const bridgeMove=!!g.bridgeAbove14||bridgeUpperEntry14(g,p.x,p.y,cx,cy);g.bridgeMove14=bridgeMove;const fits=freeFits12(nx,ny,false,.40,.23,q);g.bridgeMove14=false;const cross=cx!==p.x||cy!==p.y;
             if(cross||!fits){
                 // A bump still reaches the existing push, door and mechanism logic.
                 if(!cross&&!g.actionHeld)continue;if(!cross&&g.actionHeld&&g.time<g.nextPlayer)continue;
@@ -6764,13 +6764,17 @@ setupModeThree();
     history=[snap()];historyIndex=0;refreshHistory();
     window.addEventListener('resize', () => { if (!G) renderGrid(); });
     // Las rocas pueden guardar una recompensa configurable.
-    PSPEC.rockReward={t:'select',label:'Contenido de la roca',options:[['none','Vacía'],['heart','Corazón'],['cash','Monedas'],['key','Llave'],['bomb','Bomba'],['ammo','Flechas'],['shield','Escudo'],['sword','Espada'],['bow','Arco'],['fins','Aletas'],['torch','Antorcha'],['antidote','Antídoto']]};
+    PSPEC.rockReward={t:'select',label:'Contenido de la roca',options:[['none','Vacía'],['heart','Corazón'],['cash','Monedas'],['key','Llave'],['bomb','Bomba'],['ammo','Flechas'],['shield','Escudo'],['sword','Espada'],['bow','Arco'],['fins','Aletas'],['torch','Antorcha'],['antidote','Antídoto'],['roomNextChannel','Paso a otro cuarto por canal'],['roomBackChannel','Retorno entre cuartos por canal'],['hole','Hoyo']]};
+    PSPEC.rockRewardChannel={t:'select',label:'Canal de viaje · 1–20',options:Array.from({length:20},(_,i)=>[i+1,'Canal '+(i+1)])};
     if(!TOOL_PARAMS.rock.includes('rockReward'))TOOL_PARAMS.rock.push('rockReward');
-    const valuesRockBefore14=valuesForObject;valuesForObject=function(ref){const values=valuesRockBefore14(ref),token=ref.read();if(base(token)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(token,1)));values.rockReward=cfg.reward||'none';}catch{values.rockReward='none';}}return values;};
+    if(!TOOL_PARAMS.rock.includes('rockRewardChannel'))TOOL_PARAMS.rock.push('rockRewardChannel');
+    TOOL_NOTES.rock=GUIDE_DETAILS.rock+=' Al colocarla, puedes elegir que oculte un hoyo o un paso entre cuartos. Los pasos entre cuartos usan un canal del 1 al 20.';
+    const valuesRockBefore14=valuesForObject;valuesForObject=function(ref){const values=valuesRockBefore14(ref),token=ref.read();if(base(token)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(token,1)));values.rockReward=cfg.reward||'none';values.rockRewardChannel=clamp(+cfg.channel||1,1,20);}catch{values.rockReward='none';values.rockRewardChannel=1;}}return values;};
+    const buildRockRewardControls14=buildControls;buildControls=function(box,names,st){buildRockRewardControls14(box,names,st);if(!names.includes('rockRewardChannel')||!names.includes('rockReward'))return;const channelRow=box.children[names.indexOf('rockRewardChannel')],rewardSelect=box.children[names.indexOf('rockReward')].querySelector('select');if(!channelRow||!rewardSelect)return;const refresh=()=>channelRow.hidden=!['roomNextChannel','roomBackChannel'].includes(rewardSelect.value);rewardSelect.addEventListener('change',refresh);refresh();};
     const tileFromToolBeforeRock=tileFromTool;
-    tileFromTool=function(tool,st){if(tool==='rock'){const reward=st.rockReward||'none';return 'rock:'+encodeURIComponent(JSON.stringify({reward,amount:reward==='cash'?5:1}));}return tileFromToolBeforeRock(tool,st);};
+    tileFromTool=function(tool,st){if(tool==='rock'){const reward=st.rockReward||'none',channel=['roomNextChannel','roomBackChannel'].includes(reward)?clamp(+st.rockRewardChannel||1,1,20):null;return 'rock:'+encodeURIComponent(JSON.stringify({reward,amount:reward==='cash'?5:1,channel}));}return tileFromToolBeforeRock(tool,st);};
     const explodeBeforeRockLoot=explode;
-    explode=function(b){const g=G,loot=[];if(g)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=b.x+dx,y=b.y+dy,t=g.grid[y]?.[x];if(inb(x,y)&&base(t)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(t,1)));if(cfg.reward&&cfg.reward!=='none')loot.push({x,y,reward:cfg.reward,amount:cfg.amount||1});}catch{}}}explodeBeforeRockLoot(b);for(const q of loot){const obj=['cash','ammo','bomb','antidote'].includes(q.reward)?q.reward+':'+q.amount:q.reward;spawnObject(obj,q.x,q.y);}};
+    explode=function(b){const g=G,loot=[];if(g)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=b.x+dx,y=b.y+dy,t=g.grid[y]?.[x];if(inb(x,y)&&base(t)==='rock'){try{const cfg=JSON.parse(decodeURIComponent(part(t,1)));if(cfg.reward&&cfg.reward!=='none')loot.push({x,y,reward:cfg.reward,amount:cfg.amount||1,channel:clamp(+cfg.channel||1,1,20)});}catch{}}}explodeBeforeRockLoot(b);for(const q of loot){const obj=['cash','ammo','bomb','antidote'].includes(q.reward)?q.reward+':'+q.amount:['roomNextChannel','roomBackChannel'].includes(q.reward)?q.reward+':'+q.channel:q.reward;spawnObject(obj,q.x,q.y);}};
     // Ajustes finales de interacción y presentación.
     const finalPolishStyle=document.createElement('style');finalPolishStyle.textContent=`
       .room-music-box,#enableRoomMusic,#setupMusicFile,#setupMusicName,#setupMusicRemove{display:none!important}
@@ -6781,14 +6785,13 @@ setupModeThree();
     if($('editorMusicFile'))$('editorMusicFile').closest('.room-music-box')?.remove();
     if($('setupMusicFile'))$('setupMusicFile').closest('.room-music-box')?.remove();
     let editorBridges14=[],bridgeDraft14=null;
-    const bridgeToolNames14={bridgeWater:'Puente de madera sobre agua',bridge:'Puente de madera · cualquier piso'};
-    Object.assign(ICONS,{bridgeWater:'🌉',bridge:'🪵'});
+    const bridgeToolNames14={bridge:'Puente de madera · cualquier piso'};
+    Object.assign(ICONS,{bridge:'🪵'});
     for(const[tool,label]of Object.entries(bridgeToolNames14))addAquaticTool(tool,label);
     const bridgeToolButtons14=[...document.querySelectorAll('#toolbar .tool-btn')].filter(b=>Object.hasOwn(bridgeToolNames14,b.dataset.tool));
     for(const button of bridgeToolButtons14)button.onclick=()=>{if(pending)cancelPending();bridgeDraft14=null;selectedTool=button.dataset.tool;document.querySelectorAll('#toolbar .tool-btn').forEach(el=>el.classList.toggle('active',el===button));renderBrushPanel();setStatus('Coloca los dos extremos en línea recta; el puente se dibujará automáticamente.',3500);};
     Object.assign(GUIDE_DETAILS,{
-        bridgeWater:'Coloca los dos extremos en línea recta, de orilla a orilla sobre agua u hoyos. El puente de tablones deja ver el agua; si ya vienes nadando, puedes pasar por debajo.',
-        bridge:'Coloca los dos extremos en línea recta sobre piso, agua u hoyos. El puente deja ver el terreno y permite nadar por debajo si ya estabas nadando.'
+        bridge:'Coloca los dos extremos en línea recta sobre el terreno. El personaje puede cruzar por debajo del tramo o subir y bajar por los extremos; arriba no lo ven ni dañan los enemigos. Los enemigos recorren el tramo por debajo, sin pasar por las entradas.'
     });
     Object.assign(TOOL_NOTES,GUIDE_DETAILS);
     const bridgeStyle14=document.createElement('style');bridgeStyle14.textContent='.cell.bridge-route{box-shadow:inset 0 0 0 4px #a97a4e!important}.cell.bridge-endpoint:after{content:\"⚓\";position:absolute;right:1px;bottom:0;font-size:12px;z-index:7;pointer-events:none}.cell.bridge-route.bridge-water{box-shadow:inset 0 0 0 4px #66c8e8!important}';document.head.append(bridgeStyle14);
@@ -6803,7 +6806,7 @@ setupModeThree();
             const path=source.path.map(p=>({x:+p?.x,y:+p?.y})),first=path[0],last=path[path.length-1],axis=first.x===last.x?'vertical':first.y===last.y?'horizontal':null;
             if(!axis||first.x===last.x&&first.y===last.y||path.some((p,i)=>!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.x>=size||p.y<0||p.y>=+input.gridSize||p.y%stride>=size||Math.floor(p.y/stride)!==Math.floor(first.y/stride)||i&&Math.abs(p.x-path[i-1].x)+Math.abs(p.y-path[i-1].y)!==1))throw Error('El puente debe ser recto y permanecer dentro del mismo piso.');
             if(path.length!==Math.abs(last.x-first.x)+Math.abs(last.y-first.y)+1||path.some((p,i)=>i>0&&((axis==='horizontal'&&p.y!==first.y)||(axis==='vertical'&&p.x!==first.x))))throw Error('El recorrido del puente está incompleto.');
-            let hasWater=false;for(const[i,p]of path.entries()){const key=p.x+','+p.y,t=input.board?.[p.y]?.[p.x],b=base(t),endpoint=i===0||i===path.length-1,valid=source.kind==='water'?(endpoint?['floor','water','hole'].includes(b):['water','hole'].includes(b)):['floor','water','hole','shallowWater'].includes(b);if(used.has(key))throw Error('Dos puentes no pueden ocupar la misma casilla.');used.add(key);if(!valid)throw Error('El puente no coincide con el terreno permitido.');if(['water','hole'].includes(b))hasWater=true;}if(source.kind==='water'&&!hasWater)throw Error('El puente sobre agua debe cruzar agua u hoyos.');
+            let hasWater=false;for(const[i,p]of path.entries()){const key=p.x+','+p.y,t=input.board?.[p.y]?.[p.x],b=base(t),endpoint=i===0||i===path.length-1,valid=source.kind==='water'?(endpoint?['floor','water','hole'].includes(b):['water','hole'].includes(b)):!!b&&!['wall','mwall'].includes(b);if(used.has(key))throw Error('Dos puentes no pueden ocupar la misma casilla.');used.add(key);if(!valid)throw Error('El puente no coincide con el terreno permitido.');if(['water','hole'].includes(b))hasWater=true;}if(source.kind==='water'&&!hasWater)throw Error('El puente sobre agua debe cruzar agua u hoyos.');
             return{id:String(source.id||newLocalId('bridge')),kind:source.kind,path};
         });
     }
@@ -6828,16 +6831,15 @@ setupModeThree();
     }
     const renderGridBridge14=renderGrid;renderGrid=function(){renderGridBridge14();markBridgeEditor14();};
     const handleCellBridge14=handleCellClick;handleCellClick=function(x,y){
-        if(!pending&&!wizard&&!objectMove&&['bridgeWater','bridge'].includes(selectedTool)){
-            const cell={x,y},terrain=base(board[y]?.[x]),isWater=selectedTool==='bridgeWater',allowed=isWater?['floor','water','hole']:['floor','water','hole','shallowWater'];
-            if(!allowed.includes(terrain)){setStatus(isWater?'Elige la orilla, agua o un hoyo para el extremo.':'Elige piso, agua u hoyos libres para el puente.',2200);return;}
+        if(!pending&&!wizard&&!objectMove&&selectedTool==='bridge'){
+            const cell={x,y},terrain=base(board[y]?.[x]),allowed=terrain&&!['wall','mwall'].includes(terrain);
+            if(!allowed){setStatus('El puente no puede colocarse sobre una pared.',2200);return;}
             if(!bridgeDraft14){bridgeDraft14=cell;renderGrid();setStatus('Primer extremo colocado. Ahora elige el otro extremo en línea recta.',2600);return;}
             if(bridgeDraft14.y!==y&&bridgeDraft14.x!==x){setStatus('Los extremos deben quedar en una misma fila o columna.',2000);return;}
             const path=bridgeCells14(bridgeDraft14,cell);if(path.length<2||path.length>21){setStatus('El puente debe medir entre 1 y 20 casillas.',2000);return;}
             const floorA=Math.floor(bridgeDraft14.y/editorStride()),floorB=Math.floor(y/editorStride());
-            const crossesWater=path.some((p,i)=>{const b=base(board[p.y]?.[p.x]);return isWater?(i===0||i===path.length-1?['water','hole'].includes(b):['water','hole'].includes(b)):['water','hole'].includes(b);});
-            if(floorA!==floorB||path.some((p,i)=>!(isWater?(i===0||i===path.length-1?allowed.includes(base(board[p.y]?.[p.x])):['water','hole'].includes(base(board[p.y]?.[p.x]))):allowed.includes(base(board[p.y]?.[p.x])))||bridgeAtEditor14(p.x,p.y))||isWater&&!crossesWater){setStatus('Todo el puente debe caber sobre terreno libre permitido del mismo piso.',2400);return;}
-            editorBridges14.push({id:newLocalId('bridge'),kind:isWater?'water':'any',path});bridgeDraft14=null;afterEdit();setStatus('Puente listo. Usa Borrar sobre el puente para quitarlo.',2300);return;
+            if(floorA!==floorB||path.some(p=>!base(board[p.y]?.[p.x])||['wall','mwall'].includes(base(board[p.y]?.[p.x]))||bridgeAtEditor14(p.x,p.y))){setStatus('Todo el puente debe caber sobre terreno sin paredes y libre de otros puentes.',2400);return;}
+            editorBridges14.push({id:newLocalId('bridge'),kind:'any',path});bridgeDraft14=null;afterEdit();setStatus('Puente listo. Puedes cruzar por debajo o subir por un extremo; los enemigos pasan por debajo.',2300);return;
         }
         return handleCellBridge14(x,y);
     };
@@ -6853,14 +6855,101 @@ setupModeThree();
     const openDraftBridgeBefore14=openDraft;openDraft=function(d){const out=openDraftBridgeBefore14(d);editorBridges14=validateBridges14(d);renderGrid();return out;};
     const resizeBridgeBefore14=resizeBoard;resizeBoard=function(size){if(editorBridges14.some(b=>b.path.some(p=>p.x>=size||p.y>=size))){gridSizeSelect.value=GRID_SIZE;setStatus('Primero borra o reubica los puentes que quedan fuera del nuevo tamaño.',2200);return;}return resizeBridgeBefore14(size);};
     const validatedRoomBridgeBefore14=validatedRoom;validatedRoom=function(input,playable=true){const data=validatedRoomBridgeBefore14(input,playable);data.bridges=validateBridges14(input);return data;};
-    const setupRoomBridgeBefore14=setupRoom;setupRoom=function(room){const data=clone(room);data.bridges=validateBridges14(data);setupRoomBridgeBefore14(data);if(G){G.bridges=data.bridges;G.bridgeUnder14=false;updateWater(G,true);}};
+    const setupRoomBridgeBefore14=setupRoom;setupRoom=function(room){const data=clone(room);data.bridges=validateBridges14(data);setupRoomBridgeBefore14(data);if(G){G.bridges=data.bridges;G.bridgeUnder14=false;G.bridgeAbove14=false;G.bridgeMove14=false;updateWater(G,true);}};
     const typeBridgeBefore14=bt,deepWaterBridgeBefore14=isDeepWater;bt=function(x,y){const g=G;if(g&&bridgeAt14(g,x,y)){if(g.bridgeUnder14&&deepWaterBridgeBefore14(g,x,y))return'water';return'floor';}return typeBridgeBefore14(x,y);};
-    isDeepWater=function(g,x,y){if(g&&bridgeAt14(g,x,y)&&g.player.x===x&&g.player.y===y&&!g.bridgeUnder14)return false;return deepWaterBridgeBefore14(g,x,y);};
-    const swimmingBridgeBefore14=isSwimming;isSwimming=function(g=G){if(g&&bridgeAt14(g,g.player.x,g.player.y))return !!g.bridgeUnder14;return swimmingBridgeBefore14(g);};
-    const moveBridgeBefore14=tryPlayerMove;tryPlayerMove=function(dir){const g=G;if(!g)return moveBridgeBefore14(dir);const p=g.player,wasUnder=!!g.bridgeUnder14,wasBridge=!!bridgeAt14(g,p.x,p.y),wasSwimming=isSwimming(g),oldX=p.x,oldY=p.y,ok=moveBridgeBefore14(dir);if(G===g&&ok){if(bridgeAt14(g,p.x,p.y))g.bridgeUnder14=wasBridge?wasUnder:wasSwimming;else g.bridgeUnder14=false;}else if(G===g&&(p.x!==oldX||p.y!==oldY))g.bridgeUnder14=false;return ok;};
-    const fallBridgeBefore14=fallPlayer;fallPlayer=function(){const g=G;if(g&&bridgeAt14(g,g.player.x,g.player.y)&&!g.bridgeUnder14)return;return fallBridgeBefore14();};
-    const safetyBridgeBefore14=checkWaterSafety;checkWaterSafety=function(){const g=G;if(g&&bridgeAt14(g,g.player.x,g.player.y)&&!g.bridgeUnder14)return;return safetyBridgeBefore14();};
-    const unsafeBridgeBefore14=unsafeEdge14;unsafeEdge14=function(x,y){if(G&&bridgeAt14(G,x,y)&&!(G.player.x===x&&G.player.y===y&&G.bridgeUnder14))return false;return unsafeBridgeBefore14(x,y);};
+    isDeepWater=function(g,x,y){if(g&&g.bridgeAbove14&&g.player.x===x&&g.player.y===y&&bridgeAt14(g,x,y))return false;return deepWaterBridgeBefore14(g,x,y);};
+    const swimmingBridgeBefore14=isSwimming;isSwimming=function(g=G){if(g&&bridgeAt14(g,g.player.x,g.player.y))return !!g.bridgeUnder14&&deepWaterBridgeBefore14(g,g.player.x,g.player.y);return swimmingBridgeBefore14(g);};
+    function bridgeEndpoint14(bridge,x,y){
+        const path=bridge?.path;if(!path?.length)return null;
+        if(path[0].x===x&&path[0].y===y){const next=path[1];return{x:path[0].x-next.x,y:path[0].y-next.y};}
+        const last=path.length-1;if(path[last].x===x&&path[last].y===y){const prev=path[last-1];return{x:path[last].x-prev.x,y:path[last].y-prev.y};}
+        return null;
+    }
+    function bridgeUpperEntry14(g,x,y,nx,ny){
+        const bridge=bridgeAt14(g,nx,ny),out=bridgeEndpoint14(bridge,nx,ny);
+        return !!bridge&&!!out&&!bridgeAt14(g,x,y)&&x===nx+out.x&&y===ny+out.y;
+    }
+    function bridgeTransitionAllowed14(g,x,y,nx,ny){
+        const from=bridgeAt14(g,x,y),to=bridgeAt14(g,nx,ny);if(!from&&!to)return true;
+        if(g.bridgeAbove14){
+            if(from&&to)return from===to;
+            const out=bridgeEndpoint14(from,x,y);return !!out&&!to&&nx===x+out.x&&ny===y+out.y;
+        }
+        if(to&&bridgeEndpoint14(to,nx,ny)){
+            if(from===to&&isSwimming(g))return true;
+            return bridgeUpperEntry14(g,x,y,nx,ny);
+        }
+        if(from&&bridgeEndpoint14(from,x,y)&&to!==from&&!isSwimming(g))return false;
+        return !from||!to||from===to;
+    }
+    const moveBridgeBefore14=tryPlayerMove;tryPlayerMove=function(dir){
+        const g=G;if(!g)return moveBridgeBefore14(dir);
+        const p=g.player,[dx,dy]=DIRS[dir],wasUnder=!!g.bridgeUnder14,wasAbove=!!g.bridgeAbove14,
+            wasBridge=!!bridgeAt14(g,p.x,p.y),wasSwimming=isSwimming(g),oldX=p.x,oldY=p.y,
+            targetX=p.x+dx,targetY=p.y+dy,targetBridge=!!bridgeAt14(g,targetX,targetY),
+            movingAbove=wasAbove||!wasUnder&&!wasSwimming&&bridgeUpperEntry14(g,p.x,p.y,targetX,targetY);
+        if(!bridgeTransitionAllowed14(g,p.x,p.y,targetX,targetY))return false;
+        g.bridgeMove14=movingAbove;
+        if(movingAbove)g.waterMoveUntil=0;
+        let ok;
+        try{ok=moveBridgeBefore14(dir);}finally{g.bridgeMove14=false;}
+        if(G===g&&ok){
+            if(bridgeAt14(g,p.x,p.y)){
+                g.bridgeAbove14=movingAbove;
+                g.bridgeUnder14=!g.bridgeAbove14;
+                if(g.bridgeAbove14)g.waterMoveUntil=0;
+            }else{g.bridgeUnder14=false;g.bridgeAbove14=false;}
+        }else if(G===g&&(p.x!==oldX||p.y!==oldY)){g.bridgeUnder14=false;g.bridgeAbove14=false;}
+        return ok;
+    };
+    const fallBridgeBefore14=fallPlayer;fallPlayer=function(){const g=G;if(g?.bridgeAbove14)return;return fallBridgeBefore14();};
+    const safetyBridgeBefore14=checkWaterSafety;checkWaterSafety=function(){if(G?.bridgeAbove14)return;return safetyBridgeBefore14();};
+    const unsafeBridgeBefore14=unsafeEdge14;unsafeEdge14=function(x,y){if(G?.bridgeAbove14&&bridgeAt14(G,x,y))return false;return unsafeBridgeBefore14(x,y);};
+    const enemyEntryBridgeBefore14=enemyCanEnter;enemyCanEnter=function(x,y){const bridge=bridgeAt14(G,x,y);if(bridge&&bridgeEndpoint14(bridge,x,y))return false;return enemyEntryBridgeBefore14(x,y);};
+    const blockBridgeBefore14=blockAt,enemyBridgeBefore14=enemyAt,wallBridgeBefore14=mwallAt;
+    blockAt=function(x,y){if(G?.bridgeMove14&&bridgeAt14(G,x,y))return null;return blockBridgeBefore14(x,y);};
+    enemyAt=function(x,y){if(G?.bridgeMove14&&bridgeAt14(G,x,y))return null;return enemyBridgeBefore14(x,y);};
+    mwallAt=function(x,y){if(G?.bridgeMove14&&bridgeAt14(G,x,y))return null;return wallBridgeBefore14(x,y);};
+    function playerBridgeAbove14(){return !!G&&(!!G.bridgeAbove14||!!bridgeAt14(G,G.player.x,G.player.y)&&!G.bridgeUnder14);}
+    const losBridgeBefore14=hasLOS;hasLOS=function(x0,y0,x1,y1){if(playerBridgeAbove14()&&x1===G.player.x&&y1===G.player.y)return false;return losBridgeBefore14(x0,y0,x1,y1);};
+    const seesBridgeBefore14=seesPlayer;seesPlayer=function(e){if(playerBridgeAbove14())return false;return seesBridgeBefore14(e);};
+    const observeBridgeBefore14=observeEnemy;observeEnemy=function(e,now){if(playerBridgeAbove14()){e.lastSeen=null;e.aiStrike=null;e.order=null;if(e.state==='chase')e.state='idle';if(e.aiState==='hunt'||e.aiState==='attack'||e.aiState==='ambush'||e.aiState==='rally')e.aiState='explore';return false;}return observeBridgeBefore14(e,now);};
+    const hurtBridgeBefore14=hurtPlayer;hurtPlayer=function(msg,e,poisonTick=false){if(G?.fallTransition||playerBridgeAbove14())return;return hurtBridgeBefore14(msg,e,poisonTick);};
+    const enemyBehaviorBridgeBefore14=updateEnemyBehavior;updateEnemyBehavior=function(e,now){
+        if(playerBridgeAbove14()){
+            e.lastSeen=null;e.aiStrike=null;e.order=null;if(e.state==='chase'||e.state==='return')e.state='idle';
+            if(e.aiState==='hunt'||e.aiState==='attack'||e.aiState==='ambush'||e.aiState==='rally')e.aiState='explore';
+            if(e.phase==='down'||e.kind===3||e.kind===5||isGiantEnemy(e))return true;
+            if(now>=e.next&&now>=e.stun){
+                const options=aiNeighbors(e).filter(q=>q.x!==G.player.x||q.y!==G.player.y);
+                options.sort((a,b)=>(Math.abs(b.x-G.player.x)+Math.abs(b.y-G.player.y))-(Math.abs(a.x-G.player.x)+Math.abs(a.y-G.player.y)));
+                if(options.length)takeAiStep(e,options[0],now,moveDelay(e.speed||2)+180);
+            }
+            return true;
+        }
+        return enemyBehaviorBridgeBefore14(e,now);
+    };
+    const trapsBridgeBefore14=updateTraps;updateTraps=function(){if(G?.bridgeAbove14)return;return trapsBridgeBefore14();};
+    const weaponBridgeBefore14=useWeapon;useWeapon=function(dir){if(G?.bridgeAbove14)return;return weaponBridgeBefore14(dir);};
+    function fallVisual14(g){
+        const f=g?.fallTransition;if(!f)return null;const p=clamp((g.time-f.started)/f.duration,0,1);
+        if(f.kind==='water'){const enter=clamp(p/.42,0,1),sink=clamp((p-.28)/.72,0,1),ease=enter*enter*(3-2*enter);return{kind:f.kind,progress:p,x:f.from.x+(f.to.x-f.from.x)*ease,y:f.from.y+(f.to.y-f.from.y)*ease+sink*.36,scale:1-sink*.48,alpha:1-sink*.36};}
+        return{kind:f.kind,progress:p,x:f.to.x,y:f.to.y+p*.12,scale:Math.max(.035,1-p*.965),alpha:Math.max(.12,1-p*.88)};
+    }
+    const recoverFallBefore14=recoverFromFall;recoverFromFall=function(message){
+        const g=G;if(!g||g.over||g.fallTransition)return false;const p=g.player,kind=/agua/i.test(message)||isDeepWater(g,p.x,p.y)?'water':'hole',destination=[g.fallOrigin,g.lastDryPosition].find(q=>safeRecoveryTile(g,q))||null;
+        if(!destination){const origin={x:p.x,y:p.y},candidates=[];for(let y=0;y<g.n;y++)for(let x=0;x<(g.room.floorSize||g.n);x++){const q={x,y};if(safeRecoveryTile(g,q))candidates.push({...q,d:Math.abs(x-origin.x)+Math.abs(y-origin.y)});}candidates.sort((a,b)=>a.d-b.d);if(candidates.length)destination={x:candidates[0].x,y:candidates[0].y};}
+        g.fallTransition={kind,message,started:g.time,duration:kind==='water'?1500:440,from:{x:Number.isFinite(p.rx)?p.rx:p.x,y:Number.isFinite(p.ry)?p.ry:p.y},to:{x:p.x,y:p.y},destination,shield:g.shields>0};
+        clearLabInput();g.paused=true;return true;
+    };
+    const updateFallBefore14=update;update=function(dt){
+        const g=G;if(!g?.fallTransition){updateFallBefore14(dt);return;}
+        g.time+=dt*1000;const f=g.fallTransition;if(g.time-f.started<f.duration)return;
+        g.fallTransition=null;g.paused=false;if(f.shield)g.shields--;else g.hearts=Math.max(0,(g.hearts??3)-1);
+        if(g.hearts<=0){die(f.message);return;}
+        if(!f.destination){die('No queda una casilla segura para regresar.');return;}
+        const p=g.player;clearLabInput();g.hookAction=null;g.hookLine=null;p.standingBox=null;g.platformRideUntil=0;g.webMoveUntil=0;Object.assign(p,{x:f.destination.x,y:f.destination.y,rx:f.destination.x,ry:f.destination.y});g.lastDryPosition={...f.destination};g.fallOrigin={...f.destination};g.nextPlayer=g.time+400;g.waterMoveUntil=0;g.invuln=Math.max(g.invuln,g.time+1500);g.hudText='';g.effects.push({kind:'pop',...f.to,t0:g.time,dur:500,ch:f.kind==='water'?'💦':'⬇️'});g.effects.push({kind:'pop',...f.destination,t0:g.time,dur:500,ch:f.shield?'🛡️':'💔'});computeHolds();computeBeams();visitDarkZones();toast(f.message+' '+(f.shield?'Perdiste un escudo.':'Perdiste un corazón.')+' Regresaste a la casilla anterior.',2200);
+    };
     gestureTouchStart=function(e){initAudio();if(!G||G.paused||G.over)return;for(const t of e.changedTouches){if(t.clientY>=window.innerHeight/2)startGesture(t.identifier,t.clientX,t.clientY);else if(!centerTouch)centerTouch={id:t.identifier,sx:t.clientX,sy:t.clientY,fired:false,since:G.time};}};
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&bridgeDraft14){e.preventDefault();e.stopImmediatePropagation();bridgeDraft14=null;renderGrid();setStatus('Colocación del puente cancelada.',1300);}},true);
 })();
