@@ -864,7 +864,7 @@ body.studio-editing .editor-grid-container{padding:5px;border-radius:9px}
     }
     function bossProps(t) {
         const p = String(t).split(':');
-        return { sp: parseInt(p[1]) || 3, hp: parseInt(p[2]) || 1, minis: parseInt(p[3]) || 3, key: p[4] === '1', coin:p[5]==='1',gold:clamp(parseInt(p[6])||0,0,100) };
+        return { sp: parseInt(p[1]) || 3, hp: parseInt(p[2]) || 1, minis: parseInt(p[3]) || 3, key: p[4] === '1', coin:p[5]==='1',gold:clamp(parseInt(p[6])||0,0,100),awake:p[8]==='1' };
     }
     const $ = id => document.getElementById(id);
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1004,12 +1004,12 @@ let editorTerrain={};let roomMusic=null,setupMusicDraft=null;let roomFloorTextur
         dir:    { t: 'dir', label: 'Dirección:' },
         hid:    { t: 'doorid', label: 'Abre la pared-botón número:' }
     };
-    const TOOL_PARAMS = {roomNext:['routeKeep'],roomBack:[],poisonGas:['poisonMs'],gasGenerator:['gasRange','poisonMs'],platform:['platformSize','platformWait'],thinWall:['edgeSide'],thinDoor:['edgeSide','edgeBehavior','channel','crossReturn','mode'],spider:['speed','hp','vision','venom','poisonMs','key','coin','goldDrop'],antidote:['qty'],shell:['speed','hp','vision','fireRange','windupMs','cooldownMs','key','coin','goldDrop'],grave:['speed','hp','vision','spawnMs','warnMs'],zombie:['speed','hp','vision'],skeleton:['speed','hp','vision','reviveMs','key','coin','goldDrop'],rat:['speed','hp','dir'],laserEnemy:['hp','dir'],hole:['holeMode'],pushblock:['dir','pushCount','pushEffect','channel'],singleButton:['channel','mode'],singleDoor:['channel'],spikes:['spikeRest','spikeActive'],touchSpikes:['trapDelay'],enemy3:['speed','hp','builderRange','buildMs','key','coin','goldDrop'],stairs:['stairDir'],hook:['hookLength'],blinkboss:['sites','speed','hpBoss','vision','appearMs','aimMs','key','coin','goldDrop'],torchdecor:['lightIntensity'],gemwall:['count'],torchwall:['count'],switch:['channel','mode','buttonUses'],crossgate:['crossReturn','mode'],cash:['amount'],bdoor:['channel','doorBehavior','dir','travel'],btn:['channel'],start:['hero','startSpeed','startHearts','startSword','startBombs','startBombCount','startBow','startAmmo','startShields','startShieldCount','startTorch','startHook','hookLength'],darkzone:['shape','width','height','darknessLevel','hasSwitch'],ftorch:['count'],
+    const TOOL_PARAMS = {roomNext:['routeKeep'],roomBack:[],poisonGas:['poisonMs'],gasGenerator:['gasRange','poisonMs'],platform:['platformSize','platformWait'],thinWall:['edgeSide'],thinDoor:['edgeSide','edgeBehavior','channel','crossReturn','mode'],spider:['speed','hp','vision','venom','poisonMs','key','coin','goldDrop'],antidote:['qty'],shell:['speed','hp','vision','fireRange','windupMs','cooldownMs','key','coin','goldDrop'],grave:['speed','hp','vision','spawnMs','warnMs'],zombie:['speed','hp','vision'],skeleton:['speed','hp','vision','reviveMs','key','coin','goldDrop'],rat:['speed','hp','dir'],laserEnemy:['hp','dir'],hole:['holeMode'],pushblock:['dir','pushCount','pushEffect','channel'],singleButton:['channel','mode'],singleDoor:['channel'],spikes:['spikeRest','spikeActive'],touchSpikes:['trapDelay'],enemy3:['speed','hp','builderRange','buildMs','key','coin','goldDrop'],stairs:['stairDir'],hook:['hookLength'],blinkboss:['sites','speed','hpBoss','vision','startMode','appearMs','aimMs','key','coin','goldDrop'],torchdecor:['lightIntensity'],gemwall:['count'],torchwall:['count'],switch:['channel','mode','buttonUses'],crossgate:['crossReturn','mode'],cash:['amount'],bdoor:['channel','doorBehavior','dir','travel'],btn:['channel'],start:['hero','startSpeed','startHearts','startSword','startBombs','startBombCount','startBow','startAmmo','startShields','startShieldCount','startTorch','startHook','hookLength'],darkzone:['shape','width','height','darknessLevel','hasSwitch'],ftorch:['count'],
         arena: ["waveCount","waveMode"],
-        snake: ['speed', 'hpBoss', 'length','vision', 'key','coin','goldDrop'], worm: ['speed', 'hpBoss','vision', 'key','coin','goldDrop'],
+        snake: ['speed', 'hpBoss', 'length','vision','startMode', 'key','coin','goldDrop'], worm: ['speed', 'hpBoss','vision','startMode', 'key','coin','goldDrop'],
         enemy: ['speed', 'hp', 'vision', 'key','coin','goldDrop'],
         enemy2: ['speed', 'hp', 'vision','key','coin','goldDrop'],
-        boss: ['speed', 'hpBoss', 'minis','vision','key','coin','goldDrop'],
+        boss: ['speed', 'hpBoss', 'minis','vision','startMode','key','coin','goldDrop'],
         ammo: ['qty'], bomb: ['qty'],
         laser: ['dir'], mwall: ['channel','mode','dir','travel'], mwbtn:['channel','buttonUses'],
         hbtn: ['hid'], wdiamond: ['count']
@@ -1132,8 +1132,8 @@ let editorTerrain={};let roomMusic=null,setupMusicDraft=null;let roomFloorTextur
         if(tool==='shop')return 'shop:'+encodeURIComponent(JSON.stringify(st.shopConfig||defaultShop()));
         if(tool==='darkzone')return 'darkzone:'+encodeURIComponent(JSON.stringify({width:st.width||4,height:st.height||4,shape:st.shape||'rect',darknessLevel:st.darknessLevel||'dim',discover:st.discover!==false}));
         if (tool === 'enemy' || tool === 'enemy2') return `${tool}:${st.speed}:${st.hp}:${st.vision}:${st.key ? 1 : 0}:${st.coin ? 1 : 0}:${clamp(st.goldDrop||0,0,100)}:${tool==='enemy2'?clamp(st.territory||2,1,15):clamp(st.vision||5,1,20)}`;
-        if (tool === 'snake' || tool === 'worm') return `${tool}:${st.speed}:${st.hp}:${st.length || 3}:${st.key ? 1 : 0}:${st.coin ? 1 : 0}:${clamp(st.goldDrop||0,0,100)}:${tool==='enemy2'?clamp(st.territory||2,1,15):clamp(st.vision||5,1,20)}`;
-        if (tool === 'boss') return `boss:${st.speed}:${st.hp}:${st.minis}:${st.key ? 1 : 0}:${st.coin ? 1 : 0}:${clamp(st.goldDrop||0,0,100)}:${tool==='enemy2'?clamp(st.territory||2,1,15):clamp(st.vision||5,1,20)}`;
+        if (tool === 'snake' || tool === 'worm') return `${tool}:${st.speed}:${st.hp}:${st.length || 3}:${st.key ? 1 : 0}:${st.coin ? 1 : 0}:${clamp(st.goldDrop||0,0,100)}:${tool==='enemy2'?clamp(st.territory||2,1,15):clamp(st.vision||5,1,20)}:${st.startMode==='active'?1:0}`;
+        if (tool === 'boss') return `boss:${st.speed}:${st.hp}:${st.minis}:${st.key ? 1 : 0}:${st.coin ? 1 : 0}:${clamp(st.goldDrop||0,0,100)}:${clamp(st.vision||5,1,20)}:${st.startMode==='active'?1:0}`;
         if(tool==='btn')return `btn:${clamp(st.channel||1,1,10)}`;
         if(tool==='mwbtn')return `mwbtn:${clamp(st.channel||1,1,10)}:tap:${clamp(st.buttonUses||1,1,3)}`;
         if (tool === 'laser') return `laser:${st.dir}`;
@@ -2170,7 +2170,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
             const pr = bossProps(t);
             g.enemies.push(Object.assign(common, {
                 kind: 3, hp: pr.hp, maxHp: pr.hp, speed: Math.min(pr.sp, g.maxE), hasKey: pr.key,hasCoin:pr.coin,hasGold:pr.gold,
-                bossState: 'summon', minisTotal: pr.minis, toSpawn: pr.minis, spawnNext: 800, openUntil: 0, vision:clamp(+part(t,7)||5,1,20),awake:false
+                bossState: 'summon', minisTotal: pr.minis, toSpawn: pr.minis, spawnNext: 800, openUntil: 0, vision:clamp(+part(t,7)||5,1,20),awake:pr.awake
             }));
         } else {
             const pr = enemyProps(t, g.room);
@@ -2185,7 +2185,7 @@ function releaseEnemyReward(e,x=e.x,y=e.y,silent=true){if(!e.deathReward)return;
     function makeChain(g,x,y,t){const old=new Set(g.chains);makeChainCore(g,x,y,deathBase(t));const r=deathPayload(t);if(r)for(const c of g.chains)if(!old.has(c))c.deathReward=r;}
     function makeChainCore(g,x,y,t) {
         const c = {kind:base(t),hp:+part(t,2)||1,maxHp:+part(t,2)||1,
-            awake:false,vision:clamp(+part(t,7)||5,1,20),speed:Math.min(+part(t,1)||3,g.maxE),length:clamp(+part(t,3)||3,3,10),
+            awake:part(t,8)==='1',vision:clamp(+part(t,7)||5,1,20),speed:Math.min(+part(t,1)||3,g.maxE),length:clamp(+part(t,3)||3,3,10),
             key:part(t,4)==='1',coin:part(t,5)==='1',gold:clamp(+part(t,6)||0,0,100),cells:[{x,y}],next:600,flash:0,decay:[]};
         g.chains.push(c);
     }
@@ -4264,7 +4264,7 @@ function valuesForObject(ref){
  if(b==='spikes'){values.spikeRest=+a[1]||1800;values.spikeActive=+a[2]||1200;}if(b==='touchSpikes')values.trapDelay=+a[1]||650;if(b==='enemy3')values.buildMs=+a[7]||1000;
  if(b==='stairs')values.stairDir=part(t,1)==='down'?'down':'up';
  if(b==='switch'){values.mode=part(t,2)||'tap';values.buttonUses=clamp(+part(t,3)||1,1,3);}if(b==='mwbtn')values.buttonUses=clamp(+part(t,3)||1,1,3);if(b==='crossgate'){Object.assign(values,parseCross(t));values.crossReturn=parseCross(t).returnType||'button';}if(b==='cash')values.amount=clamp(tileId(t),1,100);
- if(['enemy','enemy2','enemy3','boss','snake','worm','shell','zombie','skeleton','rat','laserEnemy','spider','spiderBoss','ogreBoss'].includes(b)){values.territory=clamp(+a[7]||2,1,15);values.speed=+a[1]||3;values.hp=+a[2]||1;values.key=a[4]==='1';values.coin=a[5]==='1';values.goldDrop=clamp(+a[6]||0,0,100);if(b==='boss')values.minis=+a[3]||3;else if(['snake','worm'].includes(b))values.length=+a[3]||3;else values.vision=+a[3]||5;if(['boss','snake','worm'].includes(b))values.vision=clamp(+a[7]||5,1,20);}
+ if(['enemy','enemy2','enemy3','boss','snake','worm','shell','zombie','skeleton','rat','laserEnemy','spider','spiderBoss','ogreBoss'].includes(b)){values.territory=clamp(+a[7]||2,1,15);values.speed=+a[1]||3;values.hp=+a[2]||1;values.key=a[4]==='1';values.coin=a[5]==='1';values.goldDrop=clamp(+a[6]||0,0,100);if(b==='boss')values.minis=+a[3]||3;else if(['snake','worm'].includes(b))values.length=+a[3]||3;else values.vision=+a[3]||5;if(['boss','snake','worm'].includes(b))values.vision=clamp(+a[7]||5,1,20);if(['boss','snake','worm'].includes(b))values.startMode=a[8]==='1'?'active':'sleep';}
  if(b==='torchdecor')values.lightIntensity=clamp(+part(t,1)||5,1,10);
  if(b==='arena'){try{values.waveMode=JSON.parse(decodeURIComponent(part(t,1))).waveMode||'sequential';}catch(e){}}if(b==='pushblock'){values.dir=part(t,1)||'R';values.pushCount=+part(t,2)||1;values.pushEffect=part(t,3)||'none';values.channel=+part(t,4)||1;}if(b==='ammo'||b==='bomb')values.qty=tileId(t);if(b==='laser')values.dir=dirOf(t);if(b==='hook')values.hookLength=clamp(+a[1]||5,1,20);if(b==='mwall')values.travel=clamp(+a[3]||1,1,10);if(b==='mwall')values.dir=mwDir(t);if(b==='hbtn')values.hid=tileId(t);if(b==='start'){values.startSpeed=playerSpeed;Object.assign(values,brushFromGear(startGear));}
  if(['wd','ftorch','wspawn','remwall'].includes(b))values.count=(ref.env?.wgroups?.[tileId(t)]||groups[tileId(t)])?.count||1;
@@ -4643,11 +4643,11 @@ function grantHookLoot(tile){const g=G,p=g.player,under=g.grid[p.y][p.x];g.grid[
 
 function blinkTile(c){return`blinkboss:${c.id}:`+encodeURIComponent(JSON.stringify(c));}
 function readBlink(t){try{return JSON.parse(decodeURIComponent(part(t,2)));}catch(e){return{};}}
-function blinkConfig(st,id,points){return{id,points,appearMs:clamp(st.appearMs||1100,200,6000),aimMs:clamp(st.aimMs||1300,200,6000),speed:clamp(st.speed||3,1,10),hp:st.hp||1,vision:st.vision||5,key:!!st.key,coin:!!st.coin,gold:st.goldDrop||0};}
+function blinkConfig(st,id,points){return{id,points,appearMs:clamp(st.appearMs||1100,200,6000),aimMs:clamp(st.aimMs||1300,200,6000),speed:clamp(st.speed||3,1,10),hp:st.hp||1,vision:st.vision||5,key:!!st.key,coin:!!st.coin,gold:st.goldDrop||0,startMode:st.startMode||'sleep'};}
 function startBlinkPlacement(x,y){if(base(board[y][x])!=='floor'||futureReservations().some(p=>p.x===x&&p.y===y)){setStatus('Elige piso libre.',1800);return;}const id=freeId('blinkpad');board[y][x]=`blinkpad:${id}`;pending={type:'blinkPoints',id,total:clamp(brush.sites||3,2,6),points:[{x,y}],values:{...brush}};renderGrid();showPending();}
 function placeBlinkPoint(x,y){if(base(board[y][x])!=='floor'||futureReservations().some(p=>p.x===x&&p.y===y)){setStatus('Elige otro piso libre.',1800);return;}const p=pending;p.points.push({x,y});board[y][x]=`blinkpad:${p.id}`;if(p.points.length>=p.total){const first=p.points[0];board[first.y][first.x]=blinkTile(blinkConfig(p.values,p.id,p.points));pending=null;hidePending();afterEdit();}else{renderGrid();showPending();}}
 function wizardBlink(st,pos,done){const id=wizardId('blinkpad'),points=[{...pos}],extras=[],total=clamp(st.sites||3,2,6);for(let i=1;i<total;i++)wizard.tasks.push({label:`Coloca el lugar ${i+1} de ${total} del jefe de destellos.`,run:q=>{points.push(q);extras.push({...q,tile:`blinkpad:${id}`});if(points.length===total)done(packBundle({tile:blinkTile(blinkConfig(st,id,points)),extras}));}});}
-function makeBlinkBoss(g,x,y,t){const c=readBlink(t);g.blinkPlatforms??=[];for(const p of c.points||[])if(!g.blinkPlatforms.some(q=>q.x===p.x&&q.y===p.y))g.blinkPlatforms.push({...p});if(!c.points?.length){c.points=[{x,y}];for(let yy=0;yy<g.n&&c.points.length<3;yy++)for(let xx=0;xx<g.n&&c.points.length<3;xx++)if(Math.hypot(xx-x,yy-y)>=2&&base(g.grid[yy][xx])==='floor')c.points.push({x:xx,y:yy});}g.enemies.push({kind:5,x,y,rx:x,ry:y,hx:x,hy:y,...c,maxHp:c.hp||1,hp:c.hp||1,hasKey:c.key,hasCoin:c.coin,hasGold:c.gold,awake:false,phase:'sleep',until:0,next:0,stun:0,flash:0,points:c.points||[{x,y}]});}
+function makeBlinkBoss(g,x,y,t){const c=readBlink(t);g.blinkPlatforms??=[];for(const p of c.points||[])if(!g.blinkPlatforms.some(q=>q.x===p.x&&q.y===p.y))g.blinkPlatforms.push({...p});if(!c.points?.length){c.points=[{x,y}];for(let yy=0;yy<g.n&&c.points.length<3;yy++)for(let xx=0;xx<g.n&&c.points.length<3;xx++)if(Math.hypot(xx-x,yy-y)>=2&&base(g.grid[yy][xx])==='floor')c.points.push({x:xx,y:yy});}g.enemies.push({kind:5,x,y,rx:x,ry:y,hx:x,hy:y,...c,maxHp:c.hp||1,hp:c.hp||1,hasKey:c.key,hasCoin:c.coin,hasGold:c.gold,awake:c.startMode==='active',phase:'sleep',until:0,next:0,stun:0,flash:0,points:c.points||[{x,y}]});}
 function chooseBlink(e,now){let options=e.points.filter(q=>Math.abs(q.x-G.player.x)+Math.abs(q.y-G.player.y)>1&&!blockAt(q.x,q.y)&&!mwallAt(q.x,q.y)&&!G.enemies.some(o=>o!==e&&o.x===q.x&&o.y===q.y));const other=options.filter(q=>q.x!==e.x||q.y!==e.y);if(other.length)options=other;if(!options.length){e.phase='cooldown';e.until=now+200;return;}const q=options[Math.floor(Math.random()*options.length)];e.x=e.rx=q.x;e.y=e.ry=q.y;e.phase='warning';e.until=now+(e.appearMs||Math.max(400,1400-e.speed*90));}
 function bossRay(e){const g=G,cells=[];let x=e.x,y=e.y;const tx=e.target.x,ty=e.target.y,dx=Math.abs(tx-x),sx=x<tx?1:-1,dy=-Math.abs(ty-y),sy=y<ty?1:-1;let err=dx+dy;for(let i=0;i<g.n*2;i++){if(x===tx&&y===ty)break;const v=2*err;if(v>=dy){err+=dy;x+=sx;}if(v<=dx){err+=dx;y+=sy;}if(!inb(x,y)||!edgesLineClear(e.x,e.y,x,y)||BEAM_STOP.includes(bt(x,y))||mwallAt(x,y))break;cells.push({x,y});}g.bossRays??=[];g.bossRays.push({cells,until:g.time+320});if(cells.some(q=>q.x===g.player.x&&q.y===g.player.y))hurtPlayer('⚡ ¡Te alcanzó el jefe de destellos!');playSound('shoot');}
 function blinkLogic(e,now){if(!wakeBoss(e,e))return;if(e.phase==='sleep'){chooseBlink(e,now);return;}if(e.phase==='warning'&&Math.abs(e.x-G.player.x)+Math.abs(e.y-G.player.y)<=1){chooseBlink(e,now);return;}if(now<e.until)return;if(e.phase==='warning'){if(G.player.x===e.x&&G.player.y===e.y||blockAt(e.x,e.y)){chooseBlink(e,now);return;}e.phase='aim';e.target={x:G.player.x,y:G.player.y};e.until=now+(e.aimMs||Math.max(500,1500-e.speed*80));playSound('alert');}else if(e.phase==='aim'){if(now<e.stun)return;bossRay(e);e.phase='cooldown';e.until=now+Math.max(250,1000-e.speed*65);}else chooseBlink(e,now);}
@@ -5743,12 +5743,13 @@ setupModeThree();
     for(const event of ['keyup','blur'])window.addEventListener(event,()=>{if(G)G.edgeDwell=null;});
 
     // Canales para desplazar bordes sin cambiar su orientación.
-    Object.assign(brush,{edgeSlide:'none',edgeTravel:1,bossReturn:'button'});
+    Object.assign(brush,{edgeSlide:'none',edgeTravel:1,bossReturn:'button',startMode:'sleep'});
     PSPEC.hpBoss.max=500;
     Object.assign(PSPEC,{
         edgeSlide:{t:'select',label:'Movimiento de pared delgada',options:[['none','Fija'],['negative','Arriba / izquierda'],['positive','Abajo / derecha']]},
         edgeTravel:{t:'range',label:'Casillas por pisada',min:1,max:20},
-        bossReturn:{t:'select',label:'Reabrir después de cruzar',options:[['button','Aparece un botón donde elijas'],['enemy','Aparece un enemigo con su cadena']]}
+        bossReturn:{t:'select',label:'Reabrir después de cruzar',options:[['button','Aparece un botón donde elijas'],['enemy','Aparece un enemigo con su cadena']]},
+        startMode:{t:'select',label:'Inicio del jefe',options:[['sleep','Dormido · espera al personaje'],['active','Despierto · comienza a moverse']]}
     });
     TOOL_PARAMS.thinWall=['edgeSide','edgeSlide','edgeTravel','channel'];TOOL_PARAMS.bossdoor=['bossReturn'];
     const buildControlsBeforeRound2=buildControls;
@@ -5973,21 +5974,21 @@ setupModeThree();
 
     Object.assign(brush,{bossMoveMs:1000,spawnSpiders:true,spiderWaveCount:3,spiderWaveVenom:false,slamRange:2,slamWindup:1100});
     Object.assign(PSPEC,{bossMoveMs:{t:'range',label:'Espera entre pasos · ms',min:400,max:4000,step:100},spawnSpiders:{t:'check',label:'Invocar rondas de arañas'},spiderWaveCount:{t:'range',label:'Arañas por ronda',min:1,max:5},spiderWaveVenom:{t:'check',label:'Arañas invocadas venenosas'},slamRange:{t:'range',label:'Radio del azotón · casillas',min:1,max:4},slamWindup:{t:'range',label:'Aviso antes del azotón · ms',min:600,max:2500,step:100}});
-    TOOL_PARAMS.spiderBoss=['hpBoss','vision','dir','bossMoveMs','spawnSpiders','spiderWaveCount','spiderWaveVenom','poisonMs','key','coin','goldDrop'];TOOL_PARAMS.ogreBoss=['hpBoss','vision','dir','bossMoveMs','slamRange','slamWindup','key','coin','goldDrop'];
+    TOOL_PARAMS.spiderBoss=['hpBoss','vision','startMode','dir','bossMoveMs','spawnSpiders','spiderWaveCount','spiderWaveVenom','poisonMs','key','coin','goldDrop'];TOOL_PARAMS.ogreBoss=['hpBoss','vision','startMode','dir','bossMoveMs','slamRange','slamWindup','key','coin','goldDrop'];
     PSPEC.deathCreate={t:'check',label:'Crear objeto o cadena al ser derrotado'};brush.deathCreate=false;for(const tool of Object.keys(TOOL_PARAMS))if(deathEnemy(tool)&&!TOOL_PARAMS[tool].includes('deathCreate'))TOOL_PARAMS[tool].push('deathCreate');
     addAquaticTool('spiderBoss','Jefe araña · 2 × 2');addAquaticTool('ogreBoss','Jefe ogro gigante · 2 casillas');
     addLabArt('spiderBoss','<g stroke="#41343f" stroke-width="5" fill="none" stroke-linecap="round"><path d="M22 22L9 8 3 19M21 29L7 23 2 35M22 37L8 39 3 52M24 43L14 55 18 62M42 22L55 8 61 19M43 29L57 23 62 35M42 37L56 39 61 52M40 43L50 55 46 62"/></g><ellipse cx="32" cy="39" rx="15" ry="19" fill="#825579" stroke="#302d40" stroke-width="3"/><ellipse cx="32" cy="20" rx="12" ry="12" fill="#ab766e" stroke="#302d40" stroke-width="3"/><path d="M23 14H27M37 14H41" stroke="#ffe7ae" stroke-width="4"/><path d="M29 6L26 1M35 6L38 1" stroke="#5d384c" stroke-width="4"/><ellipse cx="32" cy="46" rx="7" ry="6" fill="#9be4b4"/><path d="M27 47L32 51 37 47" fill="none" stroke="#e7ffe6" stroke-width="2"/>');
     addLabArt('ogreBoss','<path d="M12 28L3 47 12 51 20 40M50 28L62 46 53 51 45 40" fill="#688d59" stroke="#30463d" stroke-width="3"/><path d="M17 35L12 59H27L32 43 37 59H52L46 35Z" fill="#71554b" stroke="#30463d" stroke-width="3"/><path d="M16 24Q31 13 48 24L49 43Q32 50 15 43Z" fill="#7ba063" stroke="#30463d" stroke-width="3"/><ellipse cx="32" cy="17" rx="16" ry="14" fill="#91ac71" stroke="#30463d" stroke-width="3"/><path d="M19 9L15 1 27 5M43 9L49 1 37 5" fill="#e1cda5" stroke="#30463d" stroke-width="2"/><path d="M22 16H28M36 16H42M25 24H39" stroke="#243d36" stroke-width="3"/><path d="M25 24L27 30 30 24M35 24L38 30 40 24" fill="#fff0c7"/><path d="M14 39H49" stroke="#b89b64" stroke-width="5"/>');
     function isGiantToken(t){return ['spiderBoss','ogreBoss'].includes(base(t));}
     function isGiantEnemy(e){return !!e&&['spiderBoss','ogreBoss'].includes(e.type);}
-    function readGiantConfig(t){let c={};try{c=JSON.parse(decodeURIComponent(part(deathBase(t),7)||'%7B%7D'));}catch(e){}return{dir:'D',moveMs:1000,spawnSpiders:true,waveCount:3,venom:false,poisonMs:2500,slamRange:2,windup:1100,...c};}
+    function readGiantConfig(t){let c={};try{c=JSON.parse(decodeURIComponent(part(deathBase(t),7)||'%7B%7D'));}catch(e){}return{dir:'D',moveMs:1000,spawnSpiders:true,waveCount:3,venom:false,poisonMs:2500,slamRange:2,windup:1100,startMode:'sleep',...c};}
     function giantDims(type,dir){return type==='spiderBoss'?{w:2,h:2}:['L','R'].includes(dir)?{w:1,h:2}:{w:2,h:1};}
     function giantCells(e,x=e.x,y=e.y,dir=e.dir){const{w,h}=giantDims(e.type,dir),out=[];for(let j=0;j<h;j++)for(let i=0;i<w;i++)out.push({x:x+i,y:y+j});return out;}
     function giantFits(e,x,y,dir=e.dir,ignorePlayer=false){const g=G,b=floorBounds(g,e.y??y),cells=giantCells(e,x,y,dir);return cells.every(q=>q.x>=0&&q.x<b.size&&q.y>=b.y&&q.y<b.y+b.size&&!ENEMY_BLOCK.includes(bt(q.x,q.y))&&!isDeepWater(g,q.x,q.y)&&!blockAt(q.x,q.y)&&!mwallAt(q.x,q.y)&&!g.enemies.some(other=>other!==e&&(isGiantEnemy(other)?giantCells(other).some(p=>p.x===q.x&&p.y===q.y):other.x===q.x&&other.y===q.y))&&(ignorePlayer||q.x!==g.player.x||q.y!==g.player.y))&&cells.every(q=>Object.values(DIRS).every(([dx,dy])=>!cells.some(p=>p.x===q.x+dx&&p.y===q.y+dy)||!edgeBlocked(q.x,q.y,q.x+dx,q.y+dy)));}
     function giantFitsToken(t,x,y){const c=readGiantConfig(t);return giantFits({type:base(t),x,y,dir:c.dir},x,y,c.dir);}
-    const tileBossBefore4=tileFromTool;tileFromTool=function(tool,st){if(isGiantToken(tool)){const c={dir:DIRS[st.dir]?st.dir:'D',moveMs:clamp(+st.bossMoveMs|| (tool==='ogreBoss'?1800:1000),400,4000),spawnSpiders:st.spawnSpiders!==false,waveCount:clamp(+st.spiderWaveCount||3,1,5),venom:!!st.spiderWaveVenom,poisonMs:clamp(+st.poisonMs||2500,500,10000),slamRange:clamp(+st.slamRange||2,1,4),windup:clamp(+st.slamWindup||1100,600,2500)};return `${tool}:1:${clamp(+st.hp||1,1,500)}:${st.vision||7}:${st.key?1:0}:${st.coin?1:0}:${st.goldDrop||0}:`+encodeURIComponent(JSON.stringify(c));}return tileBossBefore4(tool,st);};
-    const valuesBossBefore4=valuesForObject;valuesForObject=function(ref){const v=valuesBossBefore4(ref);if(deathEnemy(ref.read()))v.deathCreate=!!deathPayload(ref.read());if(isGiantToken(ref.read())){const c=readGiantConfig(ref.read());Object.assign(v,{hp:+part(ref.read(),2)||1,vision:+part(ref.read(),3)||7,dir:c.dir,bossMoveMs:c.moveMs,spawnSpiders:c.spawnSpiders,spiderWaveCount:c.waveCount,spiderWaveVenom:c.venom,poisonMs:c.poisonMs,slamRange:c.slamRange,slamWindup:c.windup});}return v;};
-    function makeGiantEnemy(g,x,y,t){const c=readGiantConfig(t),p=enemyProps(t,g.room),type=base(t),e={type,kind:type==='spiderBoss'?13:14,x,y,rx:x,ry:y,hx:x,hy:y,dir:c.dir,hp:p.hp,maxHp:p.hp,vision:p.vis,hasKey:p.key,hasCoin:p.coin,hasGold:p.gold,speed:1,next:g.time+600,stun:0,flash:0,state:'idle',phase:'idle',config:c,wavesDone:new Set(),pendingSpiders:0,spawnNext:0};const r=deathPayload(t);if(r)e.deathReward=r;g.enemies.push(e);return e;}
+    const tileBossBefore4=tileFromTool;tileFromTool=function(tool,st){if(isGiantToken(tool)){const c={dir:DIRS[st.dir]?st.dir:'D',moveMs:clamp(+st.bossMoveMs|| (tool==='ogreBoss'?1800:1000),400,4000),spawnSpiders:st.spawnSpiders!==false,waveCount:clamp(+st.spiderWaveCount||3,1,5),venom:!!st.spiderWaveVenom,poisonMs:clamp(+st.poisonMs||2500,500,10000),slamRange:clamp(+st.slamRange||2,1,4),windup:clamp(+st.slamWindup||1100,600,2500),startMode:st.startMode||'sleep'};return `${tool}:1:${clamp(+st.hp||1,1,500)}:${st.vision||7}:${st.key?1:0}:${st.coin?1:0}:${st.goldDrop||0}:`+encodeURIComponent(JSON.stringify(c));}return tileBossBefore4(tool,st);};
+    const valuesBossBefore4=valuesForObject;valuesForObject=function(ref){const v=valuesBossBefore4(ref);if(deathEnemy(ref.read()))v.deathCreate=!!deathPayload(ref.read());if(isGiantToken(ref.read())){const c=readGiantConfig(ref.read());Object.assign(v,{hp:+part(ref.read(),2)||1,vision:+part(ref.read(),3)||7,dir:c.dir,bossMoveMs:c.moveMs,spawnSpiders:c.spawnSpiders,spiderWaveCount:c.waveCount,spiderWaveVenom:c.venom,poisonMs:c.poisonMs,slamRange:c.slamRange,slamWindup:c.windup,startMode:c.startMode||'sleep'});}return v;};
+    function makeGiantEnemy(g,x,y,t){const c=readGiantConfig(t),p=enemyProps(t,g.room),type=base(t),e={type,kind:type==='spiderBoss'?13:14,x,y,rx:x,ry:y,hx:x,hy:y,dir:c.dir,hp:p.hp,maxHp:p.hp,vision:p.vis,hasKey:p.key,hasCoin:p.coin,hasGold:p.gold,speed:1,next:g.time+600,stun:0,flash:0,state:'idle',phase:'idle',config:c,wavesDone:new Set(),pendingSpiders:0,spawnNext:0,awake:c.startMode==='active'};const r=deathPayload(t);if(r)e.deathReward=r;g.enemies.push(e);return e;}
     const makeEnemyBefore4=makeEnemy;makeEnemy=function(g,x,y,t){if(isGiantToken(t))return makeGiantEnemy(g,x,y,t);return makeEnemyBefore4(g,x,y,t);};
     const spawnBossBefore4=spawnObject;spawnObject=function(t,x,y){if(isGiantToken(t)&&!G.initializing&&!giantFitsToken(t,x,y)){G.pendingGiants??=[];if(!G.pendingGiants.some(p=>p.t===t&&p.x===x&&p.y===y))G.pendingGiants.push({t,x,y});return;}return spawnBossBefore4(t,x,y);};
     function retryPendingGiants(){if(!G?.pendingGiants?.length)return;const pending=G.pendingGiants;G.pendingGiants=[];for(const p of pending)spawnObject(p.t,p.x,p.y);}
@@ -6953,6 +6954,13 @@ setupModeThree();
     gestureTouchStart=function(e){initAudio();if(!G||G.paused||G.over)return;for(const t of e.changedTouches){if(t.clientY>=window.innerHeight/2)startGesture(t.identifier,t.clientX,t.clientY);else if(!centerTouch)centerTouch={id:t.identifier,sx:t.clientX,sy:t.clientY,fired:false,since:G.time};}};
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&bridgeDraft14){e.preventDefault();e.stopImmediatePropagation();bridgeDraft14=null;renderGrid();setStatus('Colocación del puente cancelada.',1300);}},true);
 })();
+Object.assign(GUIDE_DETAILS,{
+    boss:GUIDE_DETAILS.boss+' En “Inicio del jefe” puedes dejarlo dormido hasta que te acerques o hacerlo comenzar activo.',
+    blinkboss:'Coloca de 2 a 6 lugares. En “Inicio del jefe”, elige si espera dormido o empieza a moverse. El destello cambia de lugar si te acercas demasiado. Espera a que se materialice y prepare su rayo: solo entonces puedes dañarlo.',
+    spiderBoss:'Elige si espera dormido hasta que te acerques o comienza activo. Vigila su orientación: solo recibe daño por la parte trasera. Puede invocar arañas.',
+    ogreBoss:'Elige si espera dormido hasta que te acerques o comienza activo. Se acerca para azotarte; aléjate cuando prepare el golpe.'
+});
+Object.assign(TOOL_NOTES,GUIDE_DETAILS);
 </script>
 </body>
 </html>
